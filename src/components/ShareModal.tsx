@@ -22,9 +22,9 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
     if (typeof window !== 'undefined') {
       const origin = window.location.origin;
       setViewerUrl(`${origin}/?room=${encodeURIComponent(roomCode)}&role=viewer`);
-      setRefereeUrl(`${origin}/?room=${encodeURIComponent(roomCode)}&role=referee&pin=${encodeURIComponent(state.refereePin || '8888')}`);
+      setRefereeUrl(`${origin}/?room=${encodeURIComponent(roomCode)}&role=referee`);
     }
-  }, [roomCode, state.refereePin]);
+  }, [roomCode]);
 
   if (!isOpen) return null;
 
@@ -142,14 +142,14 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
           </p>
         </div>
 
-        {/* 2. REFEREE ACCESS & PIN */}
+        {/* 2. REFEREE ACCESS (SECURE - NO PIN IN LINK) */}
         <div className="space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-amber-900/40">
           <div className="flex items-center justify-between">
             <label className="text-xs text-amber-300 font-bold flex items-center gap-1">
-              <Shield className="w-3.5 h-3.5" /> Dành Riêng Cho Ban Trọng Tài:
+              <Shield className="w-3.5 h-3.5" /> Dành Riêng Cho Ban Trọng Tài (Bảo Mật):
             </label>
             <span className="font-mono text-xs font-bold bg-amber-950 text-amber-300 px-2 py-0.5 rounded border border-amber-700">
-              PIN: {state.refereePin || '8888'}
+              Mã PIN: {state.refereePin || '8888'}
             </span>
           </div>
 
@@ -176,7 +176,7 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
             </button>
           </div>
           <p className="text-[10px] text-slate-400">
-            Link này tự động xác thực quyền Trọng tài (dành cho tổ trọng tài tại vạch đích).
+            🔒 Link này an toàn tuyệt đối (không chứa mã PIN). Người nhận mở link sẽ phải nhập mã PIN riêng để kích hoạt quyền Trọng tài.
           </p>
         </div>
 

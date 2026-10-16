@@ -93,7 +93,6 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     const params = new URLSearchParams(window.location.search);
     const urlRoom = params.get('room');
     const urlRole = params.get('role');
-    const urlPin = params.get('pin');
 
     const saved = localStorage.getItem(STORAGE_KEY);
     let loadedState = initialRaceState;
@@ -111,27 +110,21 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       setState(loadedState);
     }
 
-    // Role handling:
-    // If URL explicitly says ?role=viewer -> immediate viewer, NO login required!
-    // If URL has ?role=referee&pin=8888 -> verify and set referee
+    // Role handling (No PIN exposed in URLs!):
+    // If URL explicitly says ?role=viewer -> viewer
     // If previously authorized as referee on this browser -> referee
-    // Otherwise if opened as viewer link -> viewer
+    // If direct root visit (creator setting up) -> referee
+    // Otherwise from shared link -> viewer (must enter PIN to become referee)
     const hasRefereeAuth = localStorage.getItem(REFEREE_AUTH_KEY) === 'true';
     if (urlRole === 'viewer') {
       setRoleState('viewer');
-    } else if (urlRole === 'referee' && urlPin === (loadedState.refereePin || '8888')) {
-      setRoleState('referee');
-      localStorage.setItem(REFEREE_AUTH_KEY, 'true');
     } else if (hasRefereeAuth) {
       setRoleState('referee');
+    } else if (!urlRoom && !urlRole) {
+      setRoleState('referee');
+      localStorage.setItem(REFEREE_AUTH_KEY, 'true');
     } else {
-      // First time visitor or spectator: default to referee only if not viewing a shared room
-      if (urlRoom) {
-        setRoleState('viewer');
-      } else {
-        setRoleState('referee');
-        localStorage.setItem(REFEREE_AUTH_KEY, 'true');
-      }
+      setRoleState('viewer');
     }
 
     // Initialize BroadcastChannel for cross-tab sync
@@ -238,6 +231,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(REFEREE_AUTH_KEY, 'true');
         const url = new URL(window.location.href);
         url.searchParams.set('role', 'referee');
+        url.searchParams.delete('pin');
         window.history.replaceState({}, '', url.toString());
       }
       return true;
@@ -258,6 +252,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== 'undefined') {
         const url = new URL(window.location.href);
         url.searchParams.set('role', 'viewer');
+        url.searchParams.delete('pin');
         window.history.replaceState({}, '', url.toString());
       }
     } else {
@@ -267,6 +262,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(REFEREE_AUTH_KEY, 'true');
         const url = new URL(window.location.href);
         url.searchParams.set('role', 'referee');
+        url.searchParams.delete('pin');
         window.history.replaceState({}, '', url.toString());
       }
     }

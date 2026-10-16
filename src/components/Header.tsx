@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRace } from '@/context/RaceContext';
 import {
   Timer,
@@ -31,6 +31,16 @@ export default function Header({ onOpenShare }: HeaderProps) {
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+
+  // Auto prompt for PIN if opening a referee link on an unauthenticated device
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('role') === 'referee' && role === 'viewer') {
+        setIsPinModalOpen(true);
+      }
+    }
+  }, [role]);
 
   const handleSaveTitle = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
