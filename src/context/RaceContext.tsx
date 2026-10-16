@@ -88,7 +88,6 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const lastBroadcastStateRef = useRef<string>('');
   const lastPushedStateRef = useRef<string>('');
-  const lastKnownServerUpdatedAtRef = useRef<number>(0);
 
   // 1. Initialize from URL params and localStorage on client mount
   useEffect(() => {
@@ -206,9 +205,6 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.updatedAt) {
-          lastKnownServerUpdatedAtRef.current = data.updatedAt;
-        }
         if (data.state) {
           setState(prev => {
             const merged = mergeRaceStates(prev, data.state);
@@ -255,8 +251,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       if (isFetching) return;
       isFetching = true;
       try {
-        const since = lastKnownServerUpdatedAtRef.current;
-        const res = await fetch(`/api/race/sync?room=${encodeURIComponent(state.roomCode)}&since=${since}`, {
+        const res = await fetch(`/api/race/sync?room=${encodeURIComponent(state.roomCode)}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -265,19 +260,14 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         });
         if (res.ok) {
           const data = await res.json();
-          if (isMounted && data.found) {
-            if (data.updatedAt) {
-              lastKnownServerUpdatedAtRef.current = data.updatedAt;
-            }
-            if (data.changed && data.state) {
-              setState(prev => {
-                const merged = mergeRaceStates(prev, data.state);
-                const str = JSON.stringify(merged);
-                lastPushedStateRef.current = str;
-                lastBroadcastStateRef.current = str;
-                return str === JSON.stringify(prev) ? prev : merged;
-              });
-            }
+          if (isMounted && data.found && data.state) {
+            setState(prev => {
+              const merged = mergeRaceStates(prev, data.state);
+              const str = JSON.stringify(merged);
+              lastPushedStateRef.current = str;
+              lastBroadcastStateRef.current = str;
+              return str === JSON.stringify(prev) ? prev : merged;
+            });
             setLastSyncTime(Date.now());
           }
         }
@@ -289,11 +279,8 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     };
 
     fetchLatest();
-    // Ultra-fast live polling:
-    // - 200ms when race is running (5 times per second, virtually instantaneous sync)
-    // - 400ms when referee is logged in but race not yet started
-    // - 1000ms when spectator before/after race
-    const pollInterval = state.isStarted ? 200 : (role === 'referee' ? 400 : 1000);
+    // Fast live polling: 400ms when race is running or for referees, 1200ms when idle
+    const pollInterval = (state.isStarted || role === 'referee') ? 400 : 1200;
     const interval = setInterval(fetchLatest, pollInterval);
     return () => {
       isMounted = false;
