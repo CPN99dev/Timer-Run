@@ -468,47 +468,51 @@ export default function LeaderboardTab() {
                         Chi tiết thời gian 3 thành viên:
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
                         {team.members.map((m) => (
                           <div
                             key={m.id}
-                            className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-xs gap-1.5"
+                            className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between text-xs gap-2"
                           >
-                            <div className="pr-1 flex flex-wrap items-center gap-1 min-w-0 flex-1">
-                              <span className="font-mono font-bold text-emerald-400 mr-1 shrink-0">
-                                #{m.bib}
-                              </span>
-                              <span className="text-slate-200 break-words">{m.name}</span>
-                              {m.roleInTeam && (
-                                <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
-                                  m.roleInTeam === 'Leader'
-                                    ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
-                                    : 'bg-slate-800 text-slate-400 border-slate-700'
-                                }`}>
-                                  {m.roleInTeam}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono font-bold text-emerald-400 shrink-0">
+                                  #{m.bib}
                                 </span>
-                              )}
-                              {role === 'referee' && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingTarget({ type: 'team_member', teamId: team.id, member: m, teamName: team.teamName });
-                                  }}
-                                  className="text-slate-500 hover:text-emerald-400 p-0.5 rounded transition-colors shrink-0"
-                                  title={`Sửa thông tin #${m.bib}`}
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                </button>
+                                <span className="text-slate-100 font-bold text-xs sm:text-sm break-words leading-tight">{m.name}</span>
+                                {role === 'referee' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingTarget({ type: 'team_member', teamId: team.id, member: m, teamName: team.teamName });
+                                    }}
+                                    className="text-slate-500 hover:text-emerald-400 p-0.5 rounded transition-colors shrink-0"
+                                    title={`Sửa thông tin #${m.bib}`}
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                              {m.roleInTeam && (
+                                <div className="mt-1">
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border inline-block ${
+                                    m.roleInTeam === 'Leader'
+                                      ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+                                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                                  }`}>
+                                    {m.roleInTeam}
+                                  </span>
+                                </div>
                               )}
                             </div>
 
                             <div className="font-mono font-semibold text-right shrink-0">
                               {m.status === 'finished' ? (
-                                <span className="text-emerald-400">{formatElapsed(m.elapsedMs)}</span>
+                                <span className="text-emerald-400 text-xs sm:text-sm font-bold block">{formatElapsed(m.elapsedMs)}</span>
                               ) : m.status === 'running' ? (
-                                <span className="text-amber-400 text-[10px]">Đang chạy</span>
+                                <span className="text-amber-400 text-[10px] px-2 py-0.5 bg-amber-950/60 rounded border border-amber-800/60 block">Đang chạy</span>
                               ) : (
-                                <span className="text-slate-500 text-[10px]">Chưa xong</span>
+                                <span className="text-slate-500 text-[10px] block">Chưa xong</span>
                               )}
                             </div>
                           </div>

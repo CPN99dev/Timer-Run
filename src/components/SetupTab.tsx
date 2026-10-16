@@ -472,29 +472,33 @@ export default function SetupTab() {
                     )}
 
                     {/* 3 members */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-800/80">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1.5 border-t border-slate-800/80">
                       {team.members.map((member, idx) => (
                         <div
                           key={member.id}
-                          className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs gap-1.5"
+                          className="flex items-center justify-between bg-slate-900/90 px-3 py-2.5 rounded-xl border border-slate-800 text-xs gap-2"
                         >
-                          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
-                            <span className="font-mono font-bold text-emerald-400 shrink-0">#{member.bib}</span>
-                            <span className="text-slate-200 break-words">{member.name}</span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-bold text-emerald-400 shrink-0">#{member.bib}</span>
+                              <span className="text-slate-100 font-bold text-xs sm:text-sm break-words leading-tight">{member.name}</span>
+                            </div>
                             {member.roleInTeam && (
-                              <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
-                                member.roleInTeam === 'Leader'
-                                  ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
-                                  : 'bg-slate-800 text-slate-400 border-slate-700'
-                              }`}>
-                                {member.roleInTeam}
-                              </span>
+                              <div className="mt-1">
+                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border inline-block ${
+                                  member.roleInTeam === 'Leader'
+                                    ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+                                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}>
+                                  {member.roleInTeam}
+                                </span>
+                              </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0 self-center">
                             <span className={
-                              member.status === 'finished' ? 'text-emerald-400 text-[10px] font-semibold' :
-                              member.status === 'running' ? 'text-amber-400 text-[10px]' : 'text-slate-500 text-[10px]'
+                              member.status === 'finished' ? 'text-emerald-400 text-[10px] font-semibold px-2 py-0.5 bg-emerald-950/60 rounded border border-emerald-800/60' :
+                              member.status === 'running' ? 'text-amber-400 text-[10px] font-medium px-2 py-0.5 bg-amber-950/60 rounded border border-amber-800/60' : 'text-slate-500 text-[10px] px-2 py-0.5 bg-slate-800/60 rounded'
                             }>
                               {member.status === 'finished' ? 'Xong' :
                                member.status === 'running' ? 'Chạy' : 'Chờ'}
@@ -502,7 +506,7 @@ export default function SetupTab() {
                             {role === 'referee' && (
                               <button
                                 onClick={() => setEditingTarget({ type: 'team_member', teamId: team.id, member, teamName: team.teamName })}
-                                className="text-slate-400 hover:text-emerald-400 p-0.5 rounded hover:bg-slate-800 transition-colors"
+                                className="text-slate-400 hover:text-emerald-400 p-1 rounded-lg hover:bg-slate-800 transition-colors"
                                 title={`Sửa thông tin VĐV #${member.bib}`}
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
