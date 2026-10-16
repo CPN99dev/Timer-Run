@@ -110,17 +110,14 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       setState(loadedState);
     }
 
-    // Role handling (No PIN exposed in URLs!):
-    // If URL explicitly says ?role=viewer -> viewer
-    // If previously authorized as referee on this browser -> referee
-    // If direct root visit (creator setting up) -> referee
-    // Otherwise from shared link -> viewer (must enter PIN to become referee)
+    // Role handling (Single unified link for everyone!):
+    // If previously authorized as referee on this device -> referee
+    // If direct root visit without room (creator setting up) -> referee
+    // If opening any shared room link -> viewer (enter PIN via Header to become referee)
     const hasRefereeAuth = localStorage.getItem(REFEREE_AUTH_KEY) === 'true';
-    if (urlRole === 'viewer') {
-      setRoleState('viewer');
-    } else if (hasRefereeAuth) {
+    if (hasRefereeAuth) {
       setRoleState('referee');
-    } else if (!urlRoom && !urlRole) {
+    } else if (!urlRoom) {
       setRoleState('referee');
       localStorage.setItem(REFEREE_AUTH_KEY, 'true');
     } else {
@@ -230,7 +227,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       if (typeof window !== 'undefined') {
         localStorage.setItem(REFEREE_AUTH_KEY, 'true');
         const url = new URL(window.location.href);
-        url.searchParams.set('role', 'referee');
+        url.searchParams.delete('role');
         url.searchParams.delete('pin');
         window.history.replaceState({}, '', url.toString());
       }
@@ -250,18 +247,18 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     if (newRole === 'viewer') {
       setRoleState('viewer');
       if (typeof window !== 'undefined') {
+        localStorage.removeItem(REFEREE_AUTH_KEY);
         const url = new URL(window.location.href);
-        url.searchParams.set('role', 'viewer');
+        url.searchParams.delete('role');
         url.searchParams.delete('pin');
         window.history.replaceState({}, '', url.toString());
       }
     } else {
-      // Switching to referee requires PIN verification via modal/prompt
       setRoleState('referee');
       if (typeof window !== 'undefined') {
         localStorage.setItem(REFEREE_AUTH_KEY, 'true');
         const url = new URL(window.location.href);
-        url.searchParams.set('role', 'referee');
+        url.searchParams.delete('role');
         url.searchParams.delete('pin');
         window.history.replaceState({}, '', url.toString());
       }

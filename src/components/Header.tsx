@@ -32,16 +32,6 @@ export default function Header({ onOpenShare }: HeaderProps) {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
 
-  // Auto prompt for PIN if opening a referee link on an unauthenticated device
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('role') === 'referee' && role === 'viewer') {
-        setIsPinModalOpen(true);
-      }
-    }
-  }, [role]);
-
   const handleSaveTitle = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (tempTitle.trim()) {
