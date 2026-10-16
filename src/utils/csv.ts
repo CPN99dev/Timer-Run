@@ -17,7 +17,6 @@ function escapeCSV(text: string | number | null | undefined): string {
 function triggerDownload(content: string, filename: string) {
   // \uFEFF is UTF-8 BOM to display Vietnamese accents in Excel
   // "sep=,\r\n" is an official Microsoft Excel directive that instructs Excel to use comma as delimiter
-  // regardless of Windows Regional List Separator settings!
   const fullContent = '\uFEFFsep=,\r\n' + content;
   const blob = new Blob([fullContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -55,6 +54,8 @@ const INDIVIDUAL_HEADERS = [
   'Xếp Hạng',
   'Số BIB',
   'Họ Và Tên',
+  'Công Ty',
+  'Slogan',
   'Giới Tính',
   'Trạng Thái',
   'Thời Gian Xếp Hạng (Nữ -15%)',
@@ -76,6 +77,8 @@ function getIndividualRowData(r: IndividualRunner, rankNumber: number | string) 
     rankNumber,
     r.bib,
     r.name,
+    r.company || '',
+    r.slogan || '',
     r.gender || 'Nam',
     statusText,
     formatElapsed(r.adjustedElapsedMs || r.elapsedMs),
@@ -110,7 +113,7 @@ export function exportIndividualExcel(runners: IndividualRunner[], raceName: str
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [
-    { wch: 10 }, { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 18 },
+    { wch: 10 }, { wch: 10 }, { wch: 24 }, { wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 18 },
     { wch: 28 }, { wch: 22 }, { wch: 22 }, { wch: 15 }, { wch: 15 }
   ];
   XLSX.utils.book_append_sheet(wb, ws, 'Bảng Cá Nhân');
@@ -138,17 +141,21 @@ function getSortedTeams(teams: Team[]) {
 const TEAM_HEADERS = [
   'Xếp Hạng Đội',
   'Tên Đội',
+  'Slogan Đội',
   'Tổng Thời Gian Đội (3 VĐV)',
   'Thành Viên Về Nhanh Nhất',
   'Trạng Thái',
   'Số VĐV Hoàn Thành',
   'Thành Viên 1 - Tên',
+  'Thành Viên 1 - Chức Vụ',
   'Thành Viên 1 - BIB',
   'Thành Viên 1 - Thời Gian',
   'Thành Viên 2 - Tên',
+  'Thành Viên 2 - Chức Vụ',
   'Thành Viên 2 - BIB',
   'Thành Viên 2 - Thời Gian',
   'Thành Viên 3 - Tên',
+  'Thành Viên 3 - Chức Vụ',
   'Thành Viên 3 - BIB',
   'Thành Viên 3 - Thời Gian',
 ];
@@ -162,17 +169,21 @@ function getTeamRowData(team: Team, rankNumber: number | string) {
   return [
     rankNumber,
     team.teamName,
+    team.slogan || '',
     team.finishedCount === 3 ? formatElapsed(team.totalElapsedMs) : 'Chưa đủ 3 VĐV',
     team.finishedCount === 3 ? formatElapsed(team.bestMemberElapsedMs) : '-',
     statusText,
     `${team.finishedCount}/3`,
     m1?.name || '',
+    m1?.roleInTeam || '',
     m1?.bib || '',
     formatElapsed(m1?.elapsedMs),
     m2?.name || '',
+    m2?.roleInTeam || '',
     m2?.bib || '',
     formatElapsed(m2?.elapsedMs),
     m3?.name || '',
+    m3?.roleInTeam || '',
     m3?.bib || '',
     formatElapsed(m3?.elapsedMs),
   ];
@@ -202,10 +213,10 @@ export function exportTeamExcel(teams: Team[], raceName: string) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [
-    { wch: 14 }, { wch: 25 }, { wch: 25 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
-    { wch: 20 }, { wch: 12 }, { wch: 14 },
-    { wch: 20 }, { wch: 12 }, { wch: 14 },
-    { wch: 20 }, { wch: 12 }, { wch: 14 }
+    { wch: 14 }, { wch: 25 }, { wch: 30 }, { wch: 25 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
+    { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
+    { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
+    { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 14 }
   ];
   XLSX.utils.book_append_sheet(wb, ws, 'Bảng Đồng Đội');
   XLSX.writeFile(wb, `Ket_qua_Dong_doi_${getSanitizedName(raceName)}_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -259,7 +270,7 @@ export function exportAllResultsExcel(runners: IndividualRunner[], teams: Team[]
   // Sheet 1: Cá Nhân
   const wsInd = XLSX.utils.aoa_to_sheet(indData);
   wsInd['!cols'] = [
-    { wch: 10 }, { wch: 10 }, { wch: 24 }, { wch: 12 }, { wch: 18 },
+    { wch: 10 }, { wch: 10 }, { wch: 24 }, { wch: 20 }, { wch: 28 }, { wch: 12 }, { wch: 18 },
     { wch: 28 }, { wch: 22 }, { wch: 22 }, { wch: 15 }, { wch: 15 }
   ];
   XLSX.utils.book_append_sheet(wb, wsInd, 'Bảng Cá Nhân');
@@ -267,10 +278,10 @@ export function exportAllResultsExcel(runners: IndividualRunner[], teams: Team[]
   // Sheet 2: Đồng Đội
   const wsTeam = XLSX.utils.aoa_to_sheet(teamData);
   wsTeam['!cols'] = [
-    { wch: 14 }, { wch: 25 }, { wch: 25 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
-    { wch: 20 }, { wch: 12 }, { wch: 14 },
-    { wch: 20 }, { wch: 12 }, { wch: 14 },
-    { wch: 20 }, { wch: 12 }, { wch: 14 }
+    { wch: 14 }, { wch: 25 }, { wch: 30 }, { wch: 25 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
+    { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
+    { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
+    { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 14 }
   ];
   XLSX.utils.book_append_sheet(wb, wsTeam, 'Bảng Đồng Đội');
 

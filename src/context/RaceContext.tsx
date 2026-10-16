@@ -3,8 +3,9 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { RaceState, IndividualRunner, Team, TeamMember, UserRole, RunnerStatus } from '@/types/race';
 import { sound, triggerHaptic } from '@/utils/audio';
+import { OFFICIAL_INDIVIDUAL_RUNNERS, OFFICIAL_TEAMS } from '@/data/officialRaceData';
 
-const STORAGE_KEY = 'race_timer_state_v3';
+const STORAGE_KEY = 'race_timer_state_v5';
 const REFEREE_AUTH_KEY = 'race_referee_auth_v1';
 
 const initialRaceState: RaceState = {
@@ -25,8 +26,8 @@ const initialRaceState: RaceState = {
 
   pauseTime: null,
   totalPausedMs: 0,
-  individualRunners: [],
-  teams: [],
+  individualRunners: OFFICIAL_INDIVIDUAL_RUNNERS,
+  teams: OFFICIAL_TEAMS,
   lastFinishedAction: null,
   roomCode: 'RUN2026',
   refereePin: '8888',
@@ -99,15 +100,33 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (urlRoom) parsed.roomCode = urlRoom.toUpperCase();
-        loadedState = parsed;
-        setState(parsed);
+        // If saved data is from an old test session or missing official runners, migrate to official list
+        const isOldData = !parsed.individualRunners?.length 
+          || parsed.individualRunners?.some((r: { bib: string; name: string }) => r.bib === '101' || r.name === 'Nguyễn Văn Hùng')
+          || parsed.teams?.some((t: { teamName: string }) => t.teamName?.includes('Tia Chớp'));
+
+        if (isOldData) {
+          loadedState = {
+            ...initialRaceState,
+            roomCode: urlRoom ? urlRoom.toUpperCase() : (parsed.roomCode || initialRaceState.roomCode)
+          };
+          setState(loadedState);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedState));
+        } else {
+          if (urlRoom) parsed.roomCode = urlRoom.toUpperCase();
+          loadedState = parsed;
+          setState(parsed);
+        }
       } catch (e) {
         console.error('Failed to load saved race state', e);
       }
-    } else if (urlRoom) {
-      loadedState = { ...initialRaceState, roomCode: urlRoom.toUpperCase() };
+    } else {
+      loadedState = {
+        ...initialRaceState,
+        roomCode: urlRoom ? urlRoom.toUpperCase() : initialRaceState.roomCode
+      };
       setState(loadedState);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedState));
     }
 
     // Role handling:
@@ -557,58 +576,20 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
 
   const loadSampleData = () => {
     if (state.isLocked) return;
-    const sampleRunners: IndividualRunner[] = [
-      { id: 'ind-1', bib: '101', name: 'Nguyễn Văn Hùng', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
-      { id: 'ind-2', bib: '102', name: 'Trần Thị Mai', gender: 'Nữ', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
-      { id: 'ind-3', bib: '103', name: 'Lê Hoàng Nam', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
-      { id: 'ind-4', bib: '104', name: 'Phạm Minh Đức', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
-      { id: 'ind-5', bib: '105', name: 'Vũ Thuỳ Linh', gender: 'Nữ', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
-      { id: 'ind-6', bib: '106', name: 'Hoàng Anh Tuấn', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
-    ];
-
-    const sampleTeams: Team[] = [
-      {
-        id: 'team-1',
-        teamName: 'Tia Chớp Runner Club',
-        category: 'team',
-        status: 'not_started',
-        totalElapsedMs: null,
-        bestMemberElapsedMs: null,
-        finishedCount: 0,
-        members: [
-          { id: 'tm-1-1', bib: 'T01', name: 'Đặng Quốc Huy', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-          { id: 'tm-1-2', bib: 'T02', name: 'Ngô Thanh Tùng', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-          { id: 'tm-1-3', bib: 'T03', name: 'Bùi Gia Bảo', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-        ]
-      },
-      {
-        id: 'team-2',
-        teamName: 'Chiến Binh Marathon',
-        category: 'team',
-        status: 'not_started',
-        totalElapsedMs: null,
-        bestMemberElapsedMs: null,
-        finishedCount: 0,
-        members: [
-          { id: 'tm-2-1', bib: 'T04', name: 'Võ Minh Trí', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-          { id: 'tm-2-2', bib: 'T05', name: 'Lý Kiến Khang', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-          { id: 'tm-2-3', bib: 'T06', name: 'Dương Văn Toàn', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-        ]
-      }
-    ];
-
     setState(prev => ({
       ...prev,
-      individualRunners: sampleRunners,
-      teams: sampleTeams,
+      individualRunners: OFFICIAL_INDIVIDUAL_RUNNERS,
+      teams: OFFICIAL_TEAMS,
       updatedAt: Date.now(),
     }));
   };
 
   const clearAllData = () => {
-    if (confirm('Bạn có chắc chắn muốn xoá toàn bộ danh sách vận động viên và đội không?')) {
+    if (confirm('Bạn có chắc chắn muốn đặt lại danh sách về dữ liệu đăng ký gốc của giải chạy không?')) {
       setState({
         ...initialRaceState,
+        individualRunners: OFFICIAL_INDIVIDUAL_RUNNERS,
+        teams: OFFICIAL_TEAMS,
         roomCode: state.roomCode,
         refereePin: state.refereePin,
         updatedAt: Date.now(),

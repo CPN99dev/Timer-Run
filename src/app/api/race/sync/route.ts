@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { RaceState } from '@/types/race';
+import { OFFICIAL_INDIVIDUAL_RUNNERS, OFFICIAL_TEAMS } from '@/data/officialRaceData';
 
-// In-memory store for active room states
-// (Can also optionally sync with Vercel KV / Upstash Redis if env vars provided)
 interface GlobalRaceStore {
   [roomCode: string]: {
     state: RaceState;
@@ -10,15 +9,54 @@ interface GlobalRaceStore {
   };
 }
 
-const raceStore: GlobalRaceStore = {};
+const defaultInitialState: RaceState = {
+  raceName: 'Giải Chạy Tiếp Sức & Vô Địch 2026',
+  isLocked: false,
+  isStarted: false,
+  isPaused: false,
+  startTime: null,
+  endTime: null,
+  individualStartTime: null,
+  individualEndTime: null,
+  individualStarted: false,
+  teamStartTime: null,
+  teamEndTime: null,
+  teamStarted: false,
+  pauseTime: null,
+  totalPausedMs: 0,
+  individualRunners: OFFICIAL_INDIVIDUAL_RUNNERS,
+  teams: OFFICIAL_TEAMS,
+  lastFinishedAction: null,
+  roomCode: 'RUN2026',
+  refereePin: '8888',
+  updatedAt: Date.now(),
+};
+
+// Pre-initialize server-side room RUN2026 with official participants
+const raceStore: GlobalRaceStore = {
+  RUN2026: {
+    state: defaultInitialState,
+    updatedAt: Date.now(),
+  }
+};
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const roomCode = (searchParams.get('room') || 'default').toUpperCase();
+  const roomCode = (searchParams.get('room') || 'RUN2026').toUpperCase();
 
-  const entry = raceStore[roomCode];
+  let entry = raceStore[roomCode];
   if (!entry) {
-    return NextResponse.json({ found: false, message: 'Room not initialized' }, { status: 404 });
+    // If room is accessed for the first time, initialize with official data
+    const now = Date.now();
+    entry = {
+      state: {
+        ...defaultInitialState,
+        roomCode,
+        updatedAt: now,
+      },
+      updatedAt: now,
+    };
+    raceStore[roomCode] = entry;
   }
 
   return NextResponse.json({

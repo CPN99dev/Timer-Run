@@ -54,7 +54,13 @@ export default function TimerTab() {
 
     if (filterType === 'all' || filterType === 'individual') {
       activeIndRunners.forEach(r => {
-        if (!q || r.bib.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)) {
+        if (
+          !q ||
+          r.bib.toLowerCase().includes(q) ||
+          r.name.toLowerCase().includes(q) ||
+          (r.company && r.company.toLowerCase().includes(q)) ||
+          (r.slogan && r.slogan.toLowerCase().includes(q))
+        ) {
           result.push({ type: 'ind', data: r });
         }
       });
@@ -66,7 +72,10 @@ export default function TimerTab() {
           !q ||
           item.member.bib.toLowerCase().includes(q) ||
           item.member.name.toLowerCase().includes(q) ||
-          item.team.teamName.toLowerCase().includes(q)
+          item.team.teamName.toLowerCase().includes(q) ||
+          (item.team.company && item.team.company.toLowerCase().includes(q)) ||
+          (item.team.slogan && item.team.slogan.toLowerCase().includes(q)) ||
+          (item.member.roleInTeam && item.member.roleInTeam.toLowerCase().includes(q))
         ) {
           result.push({ type: 'team', member: item.member, team: item.team });
         }
@@ -201,7 +210,19 @@ export default function TimerTab() {
                         #{r.bib}
                       </div>
                       <div className="truncate">
-                        <div className="text-sm font-bold text-white truncate">{r.name}</div>
+                        <div className="text-sm font-bold text-white truncate flex items-center gap-2">
+                          <span className="truncate">{r.name}</span>
+                          {r.company && (
+                            <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                              {r.company}
+                            </span>
+                          )}
+                        </div>
+                        {r.slogan && (
+                          <div className="text-[11px] text-amber-300/80 italic truncate mt-0.5">
+                            "{r.slogan}"
+                          </div>
+                        )}
                         <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3 text-slate-500" /> Cá nhân
@@ -257,13 +278,29 @@ export default function TimerTab() {
                         #{member.bib}
                       </div>
                       <div className="truncate">
-                        <div className="text-sm font-bold text-white truncate">{member.name}</div>
+                        <div className="text-sm font-bold text-white truncate flex items-center gap-2">
+                          <span className="truncate">{member.name}</span>
+                          {member.roleInTeam && (
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
+                              member.roleInTeam === 'Leader'
+                                ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+                                : 'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>
+                              {member.roleInTeam}
+                            </span>
+                          )}
+                        </div>
+                        {team.slogan && (
+                          <div className="text-[11px] text-teal-300/80 italic truncate mt-0.5">
+                            "{team.slogan}"
+                          </div>
+                        )}
                         <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                          <span className="flex items-center gap-1 text-teal-400 font-medium">
-                            <Users className="w-3 h-3" /> {team.teamName}
+                          <span className="flex items-center gap-1 text-teal-400 font-medium truncate">
+                            <Users className="w-3 h-3 shrink-0" /> {team.teamName}
                           </span>
                           <span>•</span>
-                          <span className="text-slate-400">
+                          <span className="text-slate-400 shrink-0">
                             (Đã về {team.finishedCount}/3)
                           </span>
                         </div>

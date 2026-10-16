@@ -67,7 +67,11 @@ export default function LeaderboardTab() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return sortedIndividuals;
     return sortedIndividuals.filter(
-      r => r.bib.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+      r =>
+        r.bib.toLowerCase().includes(q) ||
+        r.name.toLowerCase().includes(q) ||
+        (r.company && r.company.toLowerCase().includes(q)) ||
+        (r.slogan && r.slogan.toLowerCase().includes(q))
     );
   }, [sortedIndividuals, searchQuery]);
 
@@ -99,7 +103,14 @@ export default function LeaderboardTab() {
     return sortedTeams.filter(
       t =>
         t.teamName.toLowerCase().includes(q) ||
-        t.members.some(m => m.bib.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
+        (t.company && t.company.toLowerCase().includes(q)) ||
+        (t.slogan && t.slogan.toLowerCase().includes(q)) ||
+        t.members.some(
+          m =>
+            m.bib.toLowerCase().includes(q) ||
+            m.name.toLowerCase().includes(q) ||
+            (m.roleInTeam && m.roleInTeam.toLowerCase().includes(q))
+        )
     );
   }, [sortedTeams, searchQuery]);
 
@@ -275,7 +286,12 @@ export default function LeaderboardTab() {
 
                       <div className="truncate">
                         <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
-                          {runner.name}
+                          <span className="truncate">{runner.name}</span>
+                          {runner.company && (
+                            <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                              {runner.company}
+                            </span>
+                          )}
                           {role === 'referee' && (
                             <button
                               onClick={(e) => {
@@ -289,12 +305,17 @@ export default function LeaderboardTab() {
                             </button>
                           )}
                           {index === 0 && isFinished && (
-                            <span className="text-[10px] text-amber-400 font-semibold px-1.5 py-0.2 bg-amber-950/80 rounded border border-amber-800/60">
+                            <span className="text-[10px] text-amber-400 font-semibold px-1.5 py-0.2 bg-amber-950/80 rounded border border-amber-800/60 shrink-0">
                               Vô địch
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                        {runner.slogan && (
+                          <div className="text-[11px] text-amber-300/80 italic truncate">
+                            "{runner.slogan}"
+                          </div>
+                        )}
+                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                           <span className={isFemale ? 'text-pink-300 font-semibold' : 'text-slate-300'}>
                             {runner.gender || 'Nam'}
                           </span>
@@ -390,8 +411,18 @@ export default function LeaderboardTab() {
                         <div className="truncate">
                           <div className="text-sm font-bold text-white flex items-center gap-1.5 truncate">
                             <Users className="w-4 h-4 text-emerald-400 shrink-0" />
-                            {team.teamName}
+                            <span className="truncate">{team.teamName}</span>
+                            {team.company && team.company !== team.teamName && (
+                              <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                                {team.company}
+                              </span>
+                            )}
                           </div>
+                          {team.slogan && (
+                            <div className="text-[11px] text-teal-300/80 italic truncate mt-0.5">
+                              "{team.slogan}"
+                            </div>
+                          )}
                           <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                             <span className={
                               isAllFinished ? 'text-emerald-400 font-semibold' : 'text-amber-400'
@@ -448,6 +479,15 @@ export default function LeaderboardTab() {
                                 #{m.bib}
                               </span>
                               <span className="text-slate-200 truncate">{m.name}</span>
+                              {m.roleInTeam && (
+                                <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
+                                  m.roleInTeam === 'Leader'
+                                    ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+                                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                                }`}>
+                                  {m.roleInTeam}
+                                </span>
+                              )}
                               {role === 'referee' && (
                                 <button
                                   onClick={(e) => {

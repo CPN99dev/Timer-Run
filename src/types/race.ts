@@ -5,6 +5,8 @@ export interface IndividualRunner {
   bib: string;
   name: string;
   gender?: 'Nam' | 'Nữ' | 'Khác';
+  company?: string;
+  slogan?: string;
   category: 'individual';
   status: RunnerStatus;
   startTime: number | null; // epoch timestamp ms
@@ -18,6 +20,7 @@ export interface TeamMember {
   id: string;
   bib: string;
   name: string;
+  roleInTeam?: 'Leader' | 'Nhân viên' | string;
   status: RunnerStatus;
   startTime: number | null;
   finishTime: number | null;
@@ -27,6 +30,8 @@ export interface TeamMember {
 export interface Team {
   id: string;
   teamName: string;
+  slogan?: string;
+  company?: string;
   category: 'team';
   members: [TeamMember, TeamMember, TeamMember]; // exactly 3 runners
   status: RunnerStatus; // 'finished' when all 3 finish

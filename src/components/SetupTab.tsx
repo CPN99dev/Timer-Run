@@ -231,8 +231,20 @@ export default function SetupTab() {
                         #{runner.bib}
                       </span>
                       <div className="truncate">
-                        <div className="text-sm font-semibold text-white truncate">{runner.name}</div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                        <div className="text-sm font-semibold text-white truncate flex items-center gap-2">
+                          <span className="truncate">{runner.name}</span>
+                          {runner.company && (
+                            <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                              {runner.company}
+                            </span>
+                          )}
+                        </div>
+                        {runner.slogan && (
+                          <div className="text-[11px] text-amber-300/80 italic truncate">
+                            "{runner.slogan}"
+                          </div>
+                        )}
+                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                           <span>{runner.gender || 'Nam'}</span>
                           <span>•</span>
                           <span className={
@@ -429,11 +441,16 @@ export default function SetupTab() {
                     className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-emerald-400" />
-                        <span className="text-sm font-bold text-white">{team.teamName}</span>
+                      <div className="flex items-center gap-2 truncate">
+                        <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span className="text-sm font-bold text-white truncate">{team.teamName}</span>
+                        {team.company && team.company !== team.teamName && (
+                          <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
+                            {team.company}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300">
                           {team.finishedCount}/3 hoàn thành
                         </span>
@@ -448,6 +465,12 @@ export default function SetupTab() {
                       </div>
                     </div>
 
+                    {team.slogan && (
+                      <div className="text-[11px] text-teal-300/80 italic -mt-1 truncate">
+                        "{team.slogan}"
+                      </div>
+                    )}
+
                     {/* 3 members */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-800/80">
                       {team.members.map((member, idx) => (
@@ -458,6 +481,15 @@ export default function SetupTab() {
                           <div className="flex items-center gap-1.5 truncate">
                             <span className="font-mono font-bold text-emerald-400 shrink-0">#{member.bib}</span>
                             <span className="text-slate-200 truncate">{member.name}</span>
+                            {member.roleInTeam && (
+                              <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
+                                member.roleInTeam === 'Leader'
+                                  ? 'bg-amber-950/80 text-amber-300 border-amber-700/60'
+                                  : 'bg-slate-800 text-slate-400 border-slate-700'
+                              }`}>
+                                {member.roleInTeam}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <span className={
