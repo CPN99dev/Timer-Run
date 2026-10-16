@@ -1,0 +1,405 @@
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import { useRace } from '@/context/RaceContext';
+import { formatElapsed, formatTimeOfDay } from '@/utils/time';
+import { exportIndividualCSV, exportTeamCSV, exportAllResultsCSV } from '@/utils/csv';
+import {
+  Trophy,
+  Medal,
+  Download,
+  Users,
+  User,
+  Search,
+  CheckCircle2,
+  Clock,
+  Sparkles,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+
+export default function LeaderboardTab() {
+  const { state } = useRace();
+  const [boardType, setBoardType] = useState<'individual' | 'team'>('individual');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+
+  // Trigger celebration confetti
+  const triggerConfetti = () => {
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+  };
+
+  // Sorted individual rankings
+  const sortedIndividuals = useMemo(() => {
+    const list = [...state.individualRunners];
+    return list.sort((a, b) => {
+      if (a.status === 'finished' && b.status === 'finished') {
+        return (a.elapsedMs || 0) - (b.elapsedMs || 0);
+      }
+      if (a.status === 'finished') return -1;
+      if (b.status === 'finished') return 1;
+      if (a.status === 'running' && b.status === 'running') return 0;
+      if (a.status === 'running') return -1;
+      if (b.status === 'running') return 1;
+      return a.bib.localeCompare(b.bib);
+    });
+  }, [state.individualRunners]);
+
+  // Filtered individuals
+  const filteredIndividuals = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sortedIndividuals;
+    return sortedIndividuals.filter(
+      r => r.bib.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)
+    );
+  }, [sortedIndividuals, searchQuery]);
+
+  // Sorted team rankings
+  const sortedTeams = useMemo(() => {
+    const list = [...state.teams];
+    return list.sort((a, b) => {
+      // Both completed 3/3
+      if (a.finishedCount === 3 && b.finishedCount === 3) {
+        return (a.totalElapsedMs || 0) - (b.totalElapsedMs || 0);
+      }
+      // Completed more members comes first
+      if (a.finishedCount !== b.finishedCount) {
+        return b.finishedCount - a.finishedCount;
+      }
+      return a.teamName.localeCompare(b.teamName);
+    });
+  }, [state.teams]);
+
+  // Filtered teams
+  const filteredTeams = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sortedTeams;
+    return sortedTeams.filter(
+      t =>
+        t.teamName.toLowerCase().includes(q) ||
+        t.members.some(m => m.bib.toLowerCase().includes(q) || m.name.toLowerCase().includes(q))
+    );
+  }, [sortedTeams, searchQuery]);
+
+  const toggleTeamExpand = (teamId: string) => {
+    setExpandedTeamId(prev => (prev === teamId ? null : teamId));
+  };
+
+  const getRankBadge = (rankIndex: number, isFinished: boolean) => {
+    if (!isFinished) return <span className="text-slate-500 font-mono text-sm">-</span>;
+    if (rankIndex === 0) {
+      return (
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-400 text-slate-950 font-black text-sm shadow-md shadow-amber-500/20">
+          🥇 1
+        </span>
+      );
+    }
+    if (rankIndex === 1) {
+      return (
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-300 text-slate-950 font-black text-sm shadow-md">
+          🥈 2
+        </span>
+      );
+    }
+    if (rankIndex === 2) {
+      return (
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-700 text-white font-black text-sm shadow-md">
+          🥉 3
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-800 text-slate-300 font-bold text-xs">
+        {rankIndex + 1}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Category selector + Export buttons */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+          <button
+            onClick={() => setBoardType('individual')}
+            className={`py-2 px-3.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${
+              boardType === 'individual'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <User className="w-4 h-4" /> Bảng Cá Nhân
+          </button>
+          <button
+            onClick={() => setBoardType('team')}
+            className={`py-2 px-3.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${
+              boardType === 'team'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-4 h-4" /> Bảng Đồng Đội (3 người)
+          </button>
+        </div>
+
+        {/* Export CSV buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (boardType === 'individual') {
+                exportIndividualCSV(state.individualRunners, state.raceName);
+              } else {
+                exportTeamCSV(state.teams, state.raceName);
+              }
+            }}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold py-2 px-3 rounded-xl border border-slate-700 active:scale-95 transition-all"
+            title="Xuất bảng hiện tại ra file CSV tương thích Excel"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-400" />
+            Xuất CSV {boardType === 'individual' ? 'Cá Nhân' : 'Đồng Đội'}
+          </button>
+
+          <button
+            onClick={() => exportAllResultsCSV(state.individualRunners, state.teams, state.raceName)}
+            className="inline-flex items-center justify-center gap-1.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 text-xs font-bold py-2 px-3 rounded-xl border border-emerald-700 active:scale-95 transition-all"
+            title="Xuất cả 2 bảng ra 1 file CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Xuất Tất Cả
+          </button>
+        </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          placeholder="Tìm theo số BIB, tên VĐV hoặc tên đội..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+        />
+      </div>
+
+      {/* ================= INDIVIDUAL LEADERBOARD ================= */}
+      {boardType === 'individual' && (
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <Trophy className="w-4 h-4 text-amber-400" />
+              Bảng Xếp Hạng Cá Nhân ({filteredIndividuals.length} VĐV)
+            </h3>
+            <button
+              onClick={triggerConfetti}
+              className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-medium"
+            >
+              <Sparkles className="w-3 h-3" /> Chúc mừng VĐV
+            </button>
+          </div>
+
+          {filteredIndividuals.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-sm">
+              Chưa có dữ liệu bảng xếp hạng cá nhân.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filteredIndividuals.map((runner, index) => {
+                const isFinished = runner.status === 'finished';
+                return (
+                  <div
+                    key={runner.id}
+                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                      index === 0 && isFinished
+                        ? 'bg-amber-950/20 border-amber-500/40'
+                        : index === 1 && isFinished
+                        ? 'bg-slate-800/40 border-slate-600/40'
+                        : index === 2 && isFinished
+                        ? 'bg-amber-950/10 border-amber-700/30'
+                        : 'bg-slate-950/60 border-slate-800/80'
+                    }`}
+                  >
+                    {/* Rank & Runner Info */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="shrink-0">{getRankBadge(index, isFinished)}</div>
+
+                      <div className="font-mono text-sm font-black px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-emerald-400 shrink-0">
+                        #{runner.bib}
+                      </div>
+
+                      <div className="truncate">
+                        <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
+                          {runner.name}
+                          {index === 0 && isFinished && (
+                            <span className="text-[10px] text-amber-400 font-semibold px-1.5 py-0.2 bg-amber-950/80 rounded border border-amber-800/60">
+                              Vô địch
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                          <span>{runner.gender || 'Nam'}</span>
+                          {runner.finishTime && (
+                            <>
+                              <span>•</span>
+                              <span>Về đích lúc: {formatTimeOfDay(runner.finishTime)}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Finish Time & Status */}
+                    <div className="text-right shrink-0">
+                      {isFinished ? (
+                        <>
+                          <div className="font-mono text-base font-black text-emerald-400">
+                            {formatElapsed(runner.elapsedMs, true)}
+                          </div>
+                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 font-medium">
+                            <CheckCircle2 className="w-3 h-3" /> Hoàn thành
+                          </span>
+                        </>
+                      ) : runner.status === 'running' ? (
+                        <div className="text-xs text-amber-400 font-medium flex items-center gap-1">
+                          <Clock className="w-3 h-3 animate-spin" /> Đang chạy...
+                        </div>
+                      ) : runner.status === 'dnf' ? (
+                        <span className="text-xs text-rose-400 font-semibold">DNF (Bỏ cuộc)</span>
+                      ) : (
+                        <span className="text-xs text-slate-500">Chưa chạy</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================= TEAM LEADERBOARD ================= */}
+      {boardType === 'team' && (
+        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <Trophy className="w-4 h-4 text-amber-400" />
+              Bảng Xếp Hạng Đồng Đội ({filteredTeams.length} Đội)
+            </h3>
+            <span className="text-[11px] text-slate-400">1 đội 3 người • Tính tổng thời gian</span>
+          </div>
+
+          {filteredTeams.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-sm">
+              Chưa có dữ liệu bảng xếp hạng đồng đội.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredTeams.map((team, index) => {
+                const isAllFinished = team.finishedCount === 3;
+                const isExpanded = expandedTeamId === team.id;
+
+                return (
+                  <div
+                    key={team.id}
+                    className={`rounded-xl border transition-all overflow-hidden ${
+                      index === 0 && isAllFinished
+                        ? 'bg-amber-950/20 border-amber-500/40'
+                        : index === 1 && isAllFinished
+                        ? 'bg-slate-800/40 border-slate-600/40'
+                        : index === 2 && isAllFinished
+                        ? 'bg-amber-950/10 border-amber-700/30'
+                        : 'bg-slate-950/60 border-slate-800/80'
+                    }`}
+                  >
+                    {/* Header Row */}
+                    <div
+                      onClick={() => toggleTeamExpand(team.id)}
+                      className="p-3.5 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-800/30"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="shrink-0">{getRankBadge(index, isAllFinished)}</div>
+
+                        <div className="truncate">
+                          <div className="text-sm font-bold text-white flex items-center gap-1.5 truncate">
+                            <Users className="w-4 h-4 text-emerald-400 shrink-0" />
+                            {team.teamName}
+                          </div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                            <span className={
+                              isAllFinished ? 'text-emerald-400 font-semibold' : 'text-amber-400'
+                            }>
+                              Đã về đích: {team.finishedCount}/3 thành viên
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 block">Tổng thời gian đội</span>
+                          {isAllFinished ? (
+                            <div className="font-mono text-base font-black text-emerald-400">
+                              {formatElapsed(team.totalElapsedMs, true)}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-amber-400 font-medium">
+                              Đang chờ {3 - team.finishedCount} VĐV...
+                            </div>
+                          )}
+                        </div>
+
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Member Details Breakdown */}
+                    <div className="bg-slate-900/90 border-t border-slate-800/80 px-3.5 py-2.5 space-y-1.5">
+                      <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        Chi tiết thời gian 3 thành viên:
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        {team.members.map((m, mIdx) => (
+                          <div
+                            key={m.id}
+                            className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-xs"
+                          >
+                            <div className="truncate pr-2">
+                              <span className="font-mono font-bold text-emerald-400 mr-1.5">
+                                #{m.bib}
+                              </span>
+                              <span className="text-slate-200 truncate">{m.name}</span>
+                            </div>
+
+                            <div className="font-mono font-semibold text-right shrink-0">
+                              {m.status === 'finished' ? (
+                                <span className="text-emerald-400">{formatElapsed(m.elapsedMs)}</span>
+                              ) : m.status === 'running' ? (
+                                <span className="text-amber-400 text-[10px]">Đang chạy</span>
+                              ) : (
+                                <span className="text-slate-500 text-[10px]">Chưa xong</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
