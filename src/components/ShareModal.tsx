@@ -19,7 +19,7 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const origin = window.location.origin;
-      setShareUrl(`${origin}/?room=${encodeURIComponent(roomCode)}`);
+      setShareUrl(`${origin}/?room=${encodeURIComponent(roomCode)}&role=viewer`);
     }
   }, [roomCode]);
 

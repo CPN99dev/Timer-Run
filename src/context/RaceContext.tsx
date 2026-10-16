@@ -78,7 +78,7 @@ const RaceContext = createContext<RaceContextType | undefined>(undefined);
 
 export function RaceProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<RaceState>(initialRaceState);
-  const [role, setRoleState] = useState<UserRole>('referee');
+  const [role, setRoleState] = useState<UserRole>('viewer'); // Always default to viewer for security
   const [connectedViewers, setConnectedViewers] = useState<number>(0);
   const [isOnlineSyncActive, setIsOnlineSyncActive] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
@@ -110,18 +110,29 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       setState(loadedState);
     }
 
-    // Role handling (Single unified link for everyone!):
-    // If previously authorized as referee on this device -> referee
-    // If direct root visit without room (creator setting up) -> referee
-    // If opening any shared room link -> viewer (enter PIN via Header to become referee)
-    const hasRefereeAuth = localStorage.getItem(REFEREE_AUTH_KEY) === 'true';
-    if (hasRefereeAuth) {
-      setRoleState('referee');
-    } else if (!urlRoom) {
-      setRoleState('referee');
-      localStorage.setItem(REFEREE_AUTH_KEY, 'true');
-    } else {
+    // Role handling:
+    // If URL has ?role=viewer or is opened from a shared room link -> ALWAYS force spectator (viewer)
+    // and wipe out any previous test session tokens!
+    if (urlRole === 'viewer') {
       setRoleState('viewer');
+      localStorage.removeItem(REFEREE_AUTH_KEY);
+    } else if (urlRoom) {
+      // Opening shared room: only referee if explicitly authenticated in the current session
+      const hasRefereeAuth = localStorage.getItem(REFEREE_AUTH_KEY) === 'true';
+      if (hasRefereeAuth) {
+        setRoleState('referee');
+      } else {
+        setRoleState('viewer');
+      }
+    } else {
+      // Direct root visit on creator device without room code:
+      const hasRefereeAuth = localStorage.getItem(REFEREE_AUTH_KEY) === 'true';
+      if (hasRefereeAuth || !saved) {
+        setRoleState('referee');
+        localStorage.setItem(REFEREE_AUTH_KEY, 'true');
+      } else {
+        setRoleState('viewer');
+      }
     }
 
     // Initialize BroadcastChannel for cross-tab sync
