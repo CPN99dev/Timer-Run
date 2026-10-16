@@ -30,6 +30,7 @@ export interface Team {
   members: [TeamMember, TeamMember, TeamMember]; // exactly 3 runners
   status: RunnerStatus; // 'finished' when all 3 finish
   totalElapsedMs: number | null; // sum of 3 members' elapsedMs
+  averageElapsedMs: number | null; // average of 3 members (primary ranking metric)
   finishedCount: number; // 0, 1, 2, or 3
   rank?: number;
 }
@@ -43,8 +44,18 @@ export interface RaceState {
   isLocked: boolean; // Khoá thông tin
   isStarted: boolean;
   isPaused: boolean;
-  startTime: number | null; // Official mass start time
+  startTime: number | null; // Overall / earliest start time
   endTime: number | null;
+  
+  // Independent Category Starts
+  individualStartTime: number | null;
+  individualEndTime: number | null;
+  individualStarted: boolean;
+
+  teamStartTime: number | null;
+  teamEndTime: number | null;
+  teamStarted: boolean;
+
   pauseTime: number | null;
   totalPausedMs: number;
   individualRunners: IndividualRunner[];
@@ -60,6 +71,7 @@ export interface RaceState {
     bib: string;
   } | null;
   roomCode: string;
+  refereePin: string; // PIN to authorize referee mode (default: '8888')
   updatedAt: number;
 }
 

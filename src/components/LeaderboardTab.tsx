@@ -62,13 +62,13 @@ export default function LeaderboardTab() {
     );
   }, [sortedIndividuals, searchQuery]);
 
-  // Sorted team rankings
+  // Sorted team rankings (ranked by averageElapsedMs)
   const sortedTeams = useMemo(() => {
     const list = [...state.teams];
     return list.sort((a, b) => {
-      // Both completed 3/3
+      // Both completed 3/3: compare averageElapsedMs
       if (a.finishedCount === 3 && b.finishedCount === 3) {
-        return (a.totalElapsedMs || 0) - (b.totalElapsedMs || 0);
+        return (a.averageElapsedMs || 0) - (b.averageElapsedMs || 0);
       }
       // Completed more members comes first
       if (a.finishedCount !== b.finishedCount) {
@@ -305,7 +305,7 @@ export default function LeaderboardTab() {
               <Trophy className="w-4 h-4 text-amber-400" />
               Bảng Xếp Hạng Đồng Đội ({filteredTeams.length} Đội)
             </h3>
-            <span className="text-[11px] text-slate-400">1 đội 3 người • Tính tổng thời gian</span>
+            <span className="text-[11px] text-emerald-400 font-medium">1 đội 3 người • Xếp hạng theo thời gian trung bình</span>
           </div>
 
           {filteredTeams.length === 0 ? (
@@ -356,11 +356,16 @@ export default function LeaderboardTab() {
 
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right">
-                          <span className="text-[10px] text-slate-400 block">Tổng thời gian đội</span>
+                          <span className="text-[10px] text-slate-400 block font-medium">Thời gian TB của đội</span>
                           {isAllFinished ? (
-                            <div className="font-mono text-base font-black text-emerald-400">
-                              {formatElapsed(team.totalElapsedMs, true)}
-                            </div>
+                            <>
+                              <div className="font-mono text-base font-black text-emerald-400">
+                                {formatElapsed(team.averageElapsedMs, true)}
+                              </div>
+                              <span className="text-[10px] text-slate-500 block">
+                                Tổng 3 VĐV: {formatElapsed(team.totalElapsedMs)}
+                              </span>
+                            </>
                           ) : (
                             <div className="text-xs text-amber-400 font-medium">
                               Đang chờ {3 - team.finishedCount} VĐV...

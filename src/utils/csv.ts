@@ -65,7 +65,7 @@ export function exportIndividualCSV(runners: IndividualRunner[], raceName: strin
 export function exportTeamCSV(teams: Team[], raceName: string) {
   const sorted = [...teams].sort((a, b) => {
     if (a.finishedCount === 3 && b.finishedCount === 3) {
-      return (a.totalElapsedMs || 0) - (b.totalElapsedMs || 0);
+      return (a.averageElapsedMs || 0) - (b.averageElapsedMs || 0);
     }
     if (a.finishedCount !== b.finishedCount) {
       return b.finishedCount - a.finishedCount; // More finished members first
@@ -76,6 +76,7 @@ export function exportTeamCSV(teams: Team[], raceName: string) {
   const headers = [
     'Xếp Hạng Đội',
     'Tên Đội',
+    'Thời Gian Trung Bình Đội',
     'Tổng Thời Gian Đội',
     'Trạng Thái',
     'Số VĐV Hoàn Thành',
@@ -100,7 +101,8 @@ export function exportTeamCSV(teams: Team[], raceName: string) {
     return [
       escapeCSV(rank),
       escapeCSV(team.teamName),
-      escapeCSV(team.finishedCount === 3 ? formatElapsed(team.totalElapsedMs) : 'Chưa đủ 3 VĐV'),
+      escapeCSV(team.finishedCount === 3 ? formatElapsed(team.averageElapsedMs) : 'Chưa đủ 3 VĐV'),
+      escapeCSV(team.finishedCount === 3 ? formatElapsed(team.totalElapsedMs) : '-'),
       escapeCSV(statusText),
       escapeCSV(`${team.finishedCount}/3`),
       escapeCSV(m1?.name || ''),
@@ -149,7 +151,7 @@ export function exportAllResultsCSV(runners: IndividualRunner[], teams: Team[], 
 
   full += `\r\n--- KẾT QUẢ BẢNG ĐỒNG ĐỘI (3 NGƯỜI/ĐỘI - ${teams.length} ĐỘI) ---\r\n`;
   const teamHeaders = [
-    'Xếp Hạng', 'Tên Đội', 'Tổng Thời Gian', 'Số Người Đã Về',
+    'Xếp Hạng', 'Tên Đội', 'Thời Gian Trung Bình', 'Tổng Thời Gian', 'Số Người Đã Về',
     'VĐV 1 Tên', 'VĐV 1 BIB', 'VĐV 1 Time',
     'VĐV 2 Tên', 'VĐV 2 BIB', 'VĐV 2 Time',
     'VĐV 3 Tên', 'VĐV 3 BIB', 'VĐV 3 Time'
@@ -157,7 +159,7 @@ export function exportAllResultsCSV(runners: IndividualRunner[], teams: Team[], 
   full += teamHeaders.join(',') + '\r\n';
 
   const sortedTeams = [...teams].sort((a, b) => {
-    if (a.finishedCount === 3 && b.finishedCount === 3) return (a.totalElapsedMs || 0) - (b.totalElapsedMs || 0);
+    if (a.finishedCount === 3 && b.finishedCount === 3) return (a.averageElapsedMs || 0) - (b.averageElapsedMs || 0);
     if (a.finishedCount !== b.finishedCount) return b.finishedCount - a.finishedCount;
     return a.teamName.localeCompare(b.teamName);
   });
@@ -167,7 +169,8 @@ export function exportAllResultsCSV(runners: IndividualRunner[], teams: Team[], 
     full += [
       escapeCSV(rank),
       escapeCSV(t.teamName),
-      escapeCSV(t.finishedCount === 3 ? formatElapsed(t.totalElapsedMs) : 'Chưa xong'),
+      escapeCSV(t.finishedCount === 3 ? formatElapsed(t.averageElapsedMs) : 'Chưa xong'),
+      escapeCSV(t.finishedCount === 3 ? formatElapsed(t.totalElapsedMs) : '-'),
       escapeCSV(`${t.finishedCount}/3`),
       escapeCSV(t.members[0]?.name || ''), escapeCSV(t.members[0]?.bib || ''), escapeCSV(formatElapsed(t.members[0]?.elapsedMs)),
       escapeCSV(t.members[1]?.name || ''), escapeCSV(t.members[1]?.bib || ''), escapeCSV(formatElapsed(t.members[1]?.elapsedMs)),

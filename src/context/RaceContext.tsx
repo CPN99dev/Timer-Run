@@ -4,7 +4,8 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { RaceState, IndividualRunner, Team, TeamMember, UserRole, RunnerStatus } from '@/types/race';
 import { sound, triggerHaptic } from '@/utils/audio';
 
-const STORAGE_KEY = 'race_timer_state_v2';
+const STORAGE_KEY = 'race_timer_state_v3';
+const REFEREE_AUTH_KEY = 'race_referee_auth_v1';
 
 const initialRaceState: RaceState = {
   raceName: 'Giải Chạy Tiếp Sức & Vô Địch 2026',
@@ -13,12 +14,22 @@ const initialRaceState: RaceState = {
   isPaused: false,
   startTime: null,
   endTime: null,
+  
+  individualStartTime: null,
+  individualEndTime: null,
+  individualStarted: false,
+
+  teamStartTime: null,
+  teamEndTime: null,
+  teamStarted: false,
+
   pauseTime: null,
   totalPausedMs: 0,
   individualRunners: [],
   teams: [],
   lastFinishedAction: null,
   roomCode: 'RUN2026',
+  refereePin: '8888',
   updatedAt: 0,
 };
 
@@ -46,13 +57,21 @@ interface RaceContextType {
   loadSampleData: () => void;
   clearAllData: () => void;
   
-  // Timing
-  startRace: () => void;
+  // Timing Starts
+  startRace: () => void; // Xuất phát chung (cả 2 bảng)
+  startIndividualRace: () => void; // Xuất phát riêng Bảng Cá nhân
+  startTeamRace: () => void; // Xuất phát riêng Bảng Đồng đội
+  
+  // Timing Finishes
   recordFinishByBib: (bib: string) => { success: boolean; message: string };
   recordFinishById: (id: string, type: 'individual' | 'team_member', teamId?: string) => boolean;
   markDNF: (bib: string) => void;
   undoLastFinish: () => boolean;
   resetRaceTimer: () => void;
+
+  // Permissions
+  verifyRefereePin: (pin: string) => boolean;
+  changeRefereePin: (newPin: string) => boolean;
 }
 
 const RaceContext = createContext<RaceContextType | undefined>(undefined);
@@ -71,28 +90,48 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check URL parameters for room & role
     const params = new URLSearchParams(window.location.search);
     const urlRoom = params.get('room');
     const urlRole = params.get('role');
-
-    if (urlRole === 'viewer') {
-      setRoleState('viewer');
-    }
+    const urlPin = params.get('pin');
 
     const saved = localStorage.getItem(STORAGE_KEY);
+    let loadedState = initialRaceState;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (urlRoom) {
-          parsed.roomCode = urlRoom.toUpperCase();
-        }
+        if (urlRoom) parsed.roomCode = urlRoom.toUpperCase();
+        loadedState = parsed;
         setState(parsed);
       } catch (e) {
         console.error('Failed to load saved race state', e);
       }
     } else if (urlRoom) {
-      setState(prev => ({ ...prev, roomCode: urlRoom.toUpperCase() }));
+      loadedState = { ...initialRaceState, roomCode: urlRoom.toUpperCase() };
+      setState(loadedState);
+    }
+
+    // Role handling:
+    // If URL explicitly says ?role=viewer -> immediate viewer, NO login required!
+    // If URL has ?role=referee&pin=8888 -> verify and set referee
+    // If previously authorized as referee on this browser -> referee
+    // Otherwise if opened as viewer link -> viewer
+    const hasRefereeAuth = localStorage.getItem(REFEREE_AUTH_KEY) === 'true';
+    if (urlRole === 'viewer') {
+      setRoleState('viewer');
+    } else if (urlRole === 'referee' && urlPin === (loadedState.refereePin || '8888')) {
+      setRoleState('referee');
+      localStorage.setItem(REFEREE_AUTH_KEY, 'true');
+    } else if (hasRefereeAuth) {
+      setRoleState('referee');
+    } else {
+      // First time visitor or spectator: default to referee only if not viewing a shared room
+      if (urlRoom) {
+        setRoleState('viewer');
+      } else {
+        setRoleState('referee');
+        localStorage.setItem(REFEREE_AUTH_KEY, 'true');
+      }
     }
 
     // Initialize BroadcastChannel for cross-tab sync
@@ -108,7 +147,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       };
       broadcastChannelRef.current = bc;
     } catch {
-      // BroadcastChannel not supported in some older webviews
+      // BroadcastChannel fallback
     }
 
     return () => {
@@ -150,13 +189,11 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     if (serialized !== lastBroadcastStateRef.current) {
       lastBroadcastStateRef.current = serialized;
       
-      // BroadcastChannel
       broadcastChannelRef.current?.postMessage({
         type: 'SYNC_STATE',
         state,
       });
 
-      // If referee, sync with server
       if (role === 'referee') {
         pushStateToServer(state);
       }
@@ -191,14 +228,47 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [role, state.roomCode]);
 
-  // --- ACTIONS ---
+  // --- PERMISSION ACTIONS ---
+
+  const verifyRefereePin = (pin: string): boolean => {
+    const correctPin = state.refereePin || '8888';
+    if (pin.trim() === correctPin) {
+      setRoleState('referee');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(REFEREE_AUTH_KEY, 'true');
+        const url = new URL(window.location.href);
+        url.searchParams.set('role', 'referee');
+        window.history.replaceState({}, '', url.toString());
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const changeRefereePin = (newPin: string): boolean => {
+    const clean = newPin.trim();
+    if (!clean || clean.length < 4) return false;
+    setState(prev => ({ ...prev, refereePin: clean, updatedAt: Date.now() }));
+    return true;
+  };
 
   const setRole = (newRole: UserRole) => {
-    setRoleState(newRole);
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('role', newRole);
-      window.history.replaceState({}, '', url.toString());
+    if (newRole === 'viewer') {
+      setRoleState('viewer');
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.set('role', 'viewer');
+        window.history.replaceState({}, '', url.toString());
+      }
+    } else {
+      // Switching to referee requires PIN verification via modal/prompt
+      setRoleState('referee');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(REFEREE_AUTH_KEY, 'true');
+        const url = new URL(window.location.href);
+        url.searchParams.set('role', 'referee');
+        window.history.replaceState({}, '', url.toString());
+      }
     }
   };
 
@@ -223,7 +293,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const unlockInformation = () => {
-    if (state.isStarted && !confirm('Giải chạy đang diễn ra. Bạn có chắc chắn muốn mở khoá để sửa thông tin không?')) {
+    if (state.isStarted && !confirm('Giải chạy đang diễn ra. Bạn có chắc chắn muốn mở khoá danh sách không?')) {
       return;
     }
     triggerHaptic(50);
@@ -231,16 +301,15 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addIndividualRunner = (bib: string, name: string, gender: 'Nam' | 'Nữ' | 'Khác' = 'Nam') => {
-    if (state.isLocked) return { success: false, error: 'Thông tin đã bị khoá. Vui lòng mở khoá để chỉnh sửa.' };
+    if (state.isLocked) return { success: false, error: 'Thông tin đã bị khoá. Vui lòng mở khoá để thêm VĐV mới.' };
     const cleanBib = bib.trim().toUpperCase();
     const cleanName = name.trim();
     if (!cleanBib || !cleanName) return { success: false, error: 'Vui lòng nhập đầy đủ Số BIB và Tên VĐV' };
 
-    // Check BIB uniqueness across both individual and team members
     const existsInd = state.individualRunners.some(r => r.bib.toUpperCase() === cleanBib);
     const existsTeam = state.teams.some(t => t.members.some(m => m.bib.toUpperCase() === cleanBib));
     if (existsInd || existsTeam) {
-      return { success: false, error: `Số BIB ${cleanBib} đã tồn tại trong danh sách!` };
+      return { success: false, error: `Số BIB ${cleanBib} đã tồn tại trong giải chạy!` };
     }
 
     const newRunner: IndividualRunner = {
@@ -283,9 +352,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Vui lòng điền đủ số BIB và Họ tên VĐV' };
     }
 
-    // Check duplicate BIB against other individual runners
     const dupInd = state.individualRunners.some(r => r.id !== id && r.bib.toUpperCase() === cleanBib);
-    // Check duplicate BIB against all team members
     const dupTeam = state.teams.some(t => t.members.some(m => m.bib.toUpperCase() === cleanBib));
 
     if (dupInd || dupTeam) {
@@ -321,7 +388,6 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     if (!cleanTeamName) return { success: false, error: 'Vui lòng nhập tên đội' };
     if (membersData.length !== 3) return { success: false, error: 'Mỗi đội phải có chính xác 3 thành viên' };
 
-    // Validate members
     for (let i = 0; i < 3; i++) {
       const bib = membersData[i].bib.trim().toUpperCase();
       const name = membersData[i].name.trim();
@@ -330,7 +396,6 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    // Check unique BIBs
     const bibs = membersData.map(m => m.bib.trim().toUpperCase());
     if (new Set(bibs).size !== 3) {
       return { success: false, error: '3 thành viên trong đội không được trùng số BIB' };
@@ -383,6 +448,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       members,
       status: 'not_started',
       totalElapsedMs: null,
+      averageElapsedMs: null,
       finishedCount: 0,
     };
 
@@ -441,9 +507,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: 'Vui lòng điền đủ số BIB và Họ tên VĐV' };
     }
 
-    // Check duplicate BIB against all individual runners
     const dupInd = state.individualRunners.some(r => r.bib.toUpperCase() === cleanBib);
-    // Check duplicate BIB against other team members
     const dupTeam = state.teams.some(t =>
       t.members.some(m => m.id !== memberId && m.bib.toUpperCase() === cleanBib)
     );
@@ -499,6 +563,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         category: 'team',
         status: 'not_started',
         totalElapsedMs: null,
+        averageElapsedMs: null,
         finishedCount: 0,
         members: [
           { id: 'tm-1-1', bib: 'T01', name: 'Đặng Quốc Huy', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
@@ -512,6 +577,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         category: 'team',
         status: 'not_started',
         totalElapsedMs: null,
+        averageElapsedMs: null,
         finishedCount: 0,
         members: [
           { id: 'tm-2-1', bib: 'T04', name: 'Võ Minh Trí', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
@@ -534,14 +600,16 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       setState({
         ...initialRaceState,
         roomCode: state.roomCode,
+        refereePin: state.refereePin,
         updatedAt: Date.now(),
       });
       localStorage.removeItem(STORAGE_KEY);
     }
   };
 
-  // --- TIMING ACTIONS ---
+  // --- TIMING STARTS ---
 
+  // 1. Xuất phát chung (Mass Start - cả 2 bảng)
   const startRace = () => {
     const totalParticipants = state.individualRunners.length + state.teams.reduce((acc, t) => acc + t.members.length, 0);
     if (totalParticipants === 0) {
@@ -550,7 +618,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!state.isLocked) {
-      if (!confirm('Thông tin chưa được khoá. Hệ thống sẽ tự động khoá thông tin và bắt đầu xuất phát ngay bây giờ?')) {
+      if (!confirm('Thông tin chưa được khoá. Hệ thống sẽ tự động khoá thông tin và bắt đầu xuất phát chung ngay bây giờ?')) {
         return;
       }
     }
@@ -566,6 +634,12 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       isPaused: false,
       startTime: now,
       endTime: null,
+      individualStartTime: now,
+      individualEndTime: null,
+      individualStarted: true,
+      teamStartTime: now,
+      teamEndTime: null,
+      teamStarted: true,
       totalPausedMs: 0,
       individualRunners: prev.individualRunners.map(r => ({
         ...r,
@@ -578,6 +652,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         ...t,
         status: 'running',
         totalElapsedMs: null,
+        averageElapsedMs: null,
         finishedCount: 0,
         members: t.members.map(m => ({
           ...m,
@@ -591,10 +666,78 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const recordFinishById = (id: string, type: 'individual' | 'team_member', teamId?: string): boolean => {
-    if (!state.isStarted || !state.startTime) return false;
+  // 2. Xuất phát riêng Bảng Cá Nhân
+  const startIndividualRace = () => {
+    if (state.individualRunners.length === 0) {
+      alert('Bảng cá nhân chưa có vận động viên nào!');
+      return;
+    }
+
     const now = Date.now();
-    const elapsed = now - state.startTime - state.totalPausedMs;
+    sound.playStart();
+    triggerHaptic([60, 40, 100]);
+
+    setState(prev => ({
+      ...prev,
+      isLocked: true,
+      isStarted: true,
+      startTime: prev.startTime || now,
+      individualStartTime: now,
+      individualEndTime: null,
+      individualStarted: true,
+      individualRunners: prev.individualRunners.map(r => ({
+        ...r,
+        status: 'running',
+        startTime: now,
+        finishTime: null,
+        elapsedMs: null,
+      })),
+      updatedAt: now,
+    }));
+  };
+
+  // 3. Xuất phát riêng Bảng Đồng Đội
+  const startTeamRace = () => {
+    if (state.teams.length === 0) {
+      alert('Bảng đồng đội chưa có đội nào!');
+      return;
+    }
+
+    const now = Date.now();
+    sound.playStart();
+    triggerHaptic([60, 40, 100]);
+
+    setState(prev => ({
+      ...prev,
+      isLocked: true,
+      isStarted: true,
+      startTime: prev.startTime || now,
+      teamStartTime: now,
+      teamEndTime: null,
+      teamStarted: true,
+      teams: prev.teams.map(t => ({
+        ...t,
+        status: 'running',
+        totalElapsedMs: null,
+        averageElapsedMs: null,
+        finishedCount: 0,
+        members: t.members.map(m => ({
+          ...m,
+          status: 'running',
+          startTime: now,
+          finishTime: null,
+          elapsedMs: null,
+        })) as [TeamMember, TeamMember, TeamMember],
+      })),
+      updatedAt: now,
+    }));
+  };
+
+  // --- FINISH ACTIONS ---
+
+  const recordFinishById = (id: string, type: 'individual' | 'team_member', teamId?: string): boolean => {
+    if (!state.isStarted) return false;
+    const now = Date.now();
 
     sound.playFinish();
     triggerHaptic([50, 40, 60]);
@@ -602,6 +745,9 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     if (type === 'individual') {
       const runner = state.individualRunners.find(r => r.id === id);
       if (!runner || runner.status !== 'running') return false;
+
+      const runnerStart = runner.startTime || state.individualStartTime || state.startTime || now;
+      const elapsed = Math.max(0, now - runnerStart - state.totalPausedMs);
 
       const updatedInd = state.individualRunners.map(r => {
         if (r.id === id) {
@@ -616,20 +762,26 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       });
 
       const stillRunningInd = updatedInd.filter(r => r.status === 'running').length;
+      const isIndComplete = state.individualStarted && stillRunningInd === 0;
+
       const stillRunningTeam = state.teams.reduce(
         (acc, t) => acc + t.members.filter(m => m.status === 'running').length,
         0
       );
-      const isRaceComplete = (stillRunningInd + stillRunningTeam) === 0;
+      const isTeamComplete = state.teamStarted && stillRunningTeam === 0;
 
-      if (isRaceComplete) {
+      // Entire race finishes when all active runners from started groups finish
+      const isAllComplete = (stillRunningInd + stillRunningTeam) === 0 && (state.individualStarted || state.teamStarted);
+
+      if (isAllComplete || isIndComplete) {
         sound.playRaceComplete();
         triggerHaptic([100, 50, 100, 50, 200]);
       }
 
       setState(prev => ({
         ...prev,
-        endTime: isRaceComplete ? now : prev.endTime,
+        individualEndTime: isIndComplete ? now : prev.individualEndTime,
+        endTime: isAllComplete ? now : prev.endTime,
         lastFinishedAction: {
           type: 'individual',
           runnerId: runner.id,
@@ -649,6 +801,9 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       const member = team.members.find(m => m.id === id);
       if (!member || member.status !== 'running') return false;
 
+      const memberStart = member.startTime || state.teamStartTime || state.startTime || now;
+      const elapsed = Math.max(0, now - memberStart - state.totalPausedMs);
+
       const updatedTeams = state.teams.map(t => {
         if (t.id !== teamId) return t;
         const updatedMembers = t.members.map(m => {
@@ -666,8 +821,10 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         const finishedCount = updatedMembers.filter(m => m.status === 'finished').length;
         const allFinished = finishedCount === 3;
         let totalElapsedMs: number | null = null;
+        let averageElapsedMs: number | null = null;
         if (allFinished) {
           totalElapsedMs = updatedMembers.reduce((sum, m) => sum + (m.elapsedMs || 0), 0);
+          averageElapsedMs = Math.round(totalElapsedMs / 3);
         }
 
         return {
@@ -676,24 +833,29 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           finishedCount,
           status: (allFinished ? 'finished' : 'running') as RunnerStatus,
           totalElapsedMs,
+          averageElapsedMs,
         };
       });
 
       const stillRunningInd = state.individualRunners.filter(r => r.status === 'running').length;
+      const isIndComplete = state.individualStarted && stillRunningInd === 0;
+
       const stillRunningTeam = updatedTeams.reduce(
         (acc, t) => acc + t.members.filter(m => m.status === 'running').length,
         0
       );
-      const isRaceComplete = (stillRunningInd + stillRunningTeam) === 0;
+      const isTeamComplete = state.teamStarted && stillRunningTeam === 0;
+      const isAllComplete = (stillRunningInd + stillRunningTeam) === 0 && (state.individualStarted || state.teamStarted);
 
-      if (isRaceComplete) {
+      if (isAllComplete || isTeamComplete) {
         sound.playRaceComplete();
         triggerHaptic([100, 50, 100, 50, 200]);
       }
 
       setState(prev => ({
         ...prev,
-        endTime: isRaceComplete ? now : prev.endTime,
+        teamEndTime: isTeamComplete ? now : prev.teamEndTime,
+        endTime: isAllComplete ? now : prev.endTime,
         lastFinishedAction: {
           type: 'team_member',
           runnerId: member.id,
@@ -715,7 +877,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
 
   const recordFinishByBib = (bib: string): { success: boolean; message: string } => {
     if (!state.isStarted) {
-      return { success: false, message: 'Giải chạy chưa bắt đầu!' };
+      return { success: false, message: 'Giải chạy chưa xuất phát!' };
     }
     const cleanBib = bib.trim().toUpperCase();
     if (!cleanBib) {
@@ -725,6 +887,9 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     // Check individual runners
     const ind = state.individualRunners.find(r => r.bib.toUpperCase() === cleanBib);
     if (ind) {
+      if (!state.individualStarted) {
+        return { success: false, message: `Bảng cá nhân chưa xuất phát!` };
+      }
       if (ind.status === 'finished') {
         return { success: false, message: `BIB #${cleanBib} (${ind.name}) đã về đích trước đó rồi!` };
       }
@@ -739,6 +904,9 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     for (const t of state.teams) {
       const member = t.members.find(m => m.bib.toUpperCase() === cleanBib);
       if (member) {
+        if (!state.teamStarted) {
+          return { success: false, message: `Bảng đồng đội chưa xuất phát!` };
+        }
         if (member.status === 'finished') {
           return { success: false, message: `BIB #${cleanBib} (${member.name} - Đội ${t.teamName}) đã về đích rồi!` };
         }
@@ -778,7 +946,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         (acc, t) => acc + t.members.filter(m => m.status === 'running').length,
         0
       );
-      const isRaceComplete = (stillRunningInd + stillRunningTeam) === 0;
+      const isRaceComplete = (stillRunningInd + stillRunningTeam) === 0 && (prev.individualStarted || prev.teamStarted);
 
       return {
         ...prev,
@@ -801,7 +969,8 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       if (action.type === 'individual') {
         return {
           ...prev,
-          endTime: null, // Resume clock if stopped
+          endTime: null,
+          individualEndTime: null,
           lastFinishedAction: null,
           individualRunners: prev.individualRunners.map(r => {
             if (r.id === action.runnerId) {
@@ -819,7 +988,8 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       } else if (action.type === 'team_member' && action.teamId) {
         return {
           ...prev,
-          endTime: null, // Resume clock if stopped
+          endTime: null,
+          teamEndTime: null,
           lastFinishedAction: null,
           teams: prev.teams.map(t => {
             if (t.id !== action.teamId) return t;
@@ -842,6 +1012,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
               finishedCount,
               status: (finishedCount === 3 ? 'finished' : 'running') as RunnerStatus,
               totalElapsedMs: null,
+              averageElapsedMs: null,
             };
           }),
           updatedAt: now,
@@ -864,6 +1035,13 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       isPaused: false,
       startTime: null,
       endTime: null,
+      individualStartTime: null,
+      individualEndTime: null,
+      individualStarted: false,
+      teamStartTime: null,
+      teamEndTime: null,
+      teamStarted: false,
+      totalPausedMs: 0,
       lastFinishedAction: null,
       individualRunners: prev.individualRunners.map(r => ({
         ...r,
@@ -876,6 +1054,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         ...t,
         status: 'not_started',
         totalElapsedMs: null,
+        averageElapsedMs: null,
         finishedCount: 0,
         members: t.members.map(m => ({
           ...m,
@@ -913,11 +1092,15 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         loadSampleData,
         clearAllData,
         startRace,
+        startIndividualRace,
+        startTeamRace,
         recordFinishByBib,
         recordFinishById,
         markDNF,
         undoLastFinish,
         resetRaceTimer,
+        verifyRefereePin,
+        changeRefereePin,
       }}
     >
       {children}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRace } from '@/context/RaceContext';
 import { QRCodeSVG } from 'qrcode.react';
-import { Share2, Copy, Check, X, Users, Globe, ExternalLink } from 'lucide-react';
+import { Share2, Copy, Check, X, Shield, Eye, Sparkles } from 'lucide-react';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -11,24 +11,33 @@ interface ShareModalProps {
 }
 
 export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
-  const { roomCode, setRoomCode, isOnlineSyncActive, lastSyncTime } = useRace();
-  const [copied, setCopied] = useState(false);
-  const [shareUrl, setShareUrl] = useState('');
+  const { roomCode, setRoomCode, lastSyncTime, state } = useRace();
+  const [copiedViewer, setCopiedViewer] = useState(false);
+  const [copiedReferee, setCopiedReferee] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [refereeUrl, setRefereeUrl] = useState('');
   const [customRoom, setCustomRoom] = useState(roomCode);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const origin = window.location.origin;
-      setShareUrl(`${origin}/?room=${encodeURIComponent(roomCode)}&role=viewer`);
+      setViewerUrl(`${origin}/?room=${encodeURIComponent(roomCode)}&role=viewer`);
+      setRefereeUrl(`${origin}/?room=${encodeURIComponent(roomCode)}&role=referee&pin=${encodeURIComponent(state.refereePin || '8888')}`);
     }
-  }, [roomCode]);
+  }, [roomCode, state.refereePin]);
 
   if (!isOpen) return null;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
+  const handleCopyViewer = () => {
+    navigator.clipboard.writeText(viewerUrl);
+    setCopiedViewer(true);
+    setTimeout(() => setCopiedViewer(false), 2500);
+  };
+
+  const handleCopyReferee = () => {
+    navigator.clipboard.writeText(refereeUrl);
+    setCopiedReferee(true);
+    setTimeout(() => setCopiedReferee(false), 2500);
   };
 
   const handleApplyRoom = (e: React.FormEvent) => {
@@ -40,7 +49,7 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 text-white space-y-4 shadow-2xl relative">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 text-white space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-slate-400 hover:text-white p-1 rounded-lg"
@@ -54,7 +63,7 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
           </div>
           <div>
             <h3 className="text-base font-bold">Chia Sẻ Xem Trực Tiếp</h3>
-            <p className="text-xs text-slate-400">Khán giả & VĐV có thể cùng xem kết quả thời gian thực</p>
+            <p className="text-xs text-slate-400">Khán giả vào xem ngay lập tức, không bắt đăng nhập</p>
           </div>
         </div>
 
@@ -78,39 +87,46 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
           </div>
         </form>
 
-        {/* QR Code Container */}
+        {/* QR Code Container for Spectators */}
         <div className="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-inner">
-          {shareUrl ? (
+          {viewerUrl ? (
             <QRCodeSVG
-              value={shareUrl}
-              size={180}
+              value={viewerUrl}
+              size={170}
               level="M"
               includeMargin={false}
               className="rounded"
             />
           ) : (
-            <div className="w-44 h-44 bg-slate-200 animate-pulse rounded" />
+            <div className="w-40 h-40 bg-slate-200 animate-pulse rounded" />
           )}
-          <span className="text-[11px] text-slate-700 font-medium mt-2">
-            Quét mã để xem trực tiếp trên điện thoại
+          <span className="text-[11px] text-slate-800 font-bold mt-2 flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+            Khán giả quét mã xem ngay (Không cần đăng nhập)
           </span>
         </div>
 
-        {/* Link Copy Box */}
-        <div className="space-y-1.5">
-          <label className="text-xs text-slate-400 font-medium">Đường link khán giả (View-only):</label>
-          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl p-2">
+        {/* 1. SPECTATOR LINK (FREE ACCESS) */}
+        <div className="space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-emerald-400 font-bold flex items-center gap-1">
+              <Eye className="w-3.5 h-3.5" /> Link Khán Giả (Xem trực tiếp):
+            </label>
+            <span className="text-[10px] text-slate-400">Chỉ xem, không điều khiển</span>
+          </div>
+
+          <div className="flex items-center gap-2">
             <input
               type="text"
               readOnly
-              value={shareUrl}
-              className="bg-transparent text-xs text-slate-300 font-mono w-full focus:outline-none select-all truncate"
+              value={viewerUrl}
+              className="bg-slate-900 border border-slate-700 text-xs text-slate-200 font-mono rounded-lg px-2.5 py-1.5 w-full focus:outline-none select-all truncate"
             />
             <button
-              onClick={handleCopy}
-              className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 transition-all active:scale-95"
+              onClick={handleCopyViewer}
+              className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 transition-all active:scale-95 shadow-md"
             >
-              {copied ? (
+              {copiedViewer ? (
                 <>
                   <Check className="w-3.5 h-3.5" /> Đã chép
                 </>
@@ -121,25 +137,59 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
               )}
             </button>
           </div>
+          <p className="text-[11px] text-slate-400">
+            Khán giả bấm link trên điện thoại là xem được ngay bảng xếp hạng và đồng hồ thời gian thực!
+          </p>
         </div>
 
-        {/* Live sync status pill */}
-        <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 text-xs text-slate-300 space-y-1">
+        {/* 2. REFEREE ACCESS & PIN */}
+        <div className="space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-amber-900/40">
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 font-medium text-emerald-400">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              Trực tiếp qua Vercel Cloud Sync
-            </span>
-            <span className="text-[11px] text-slate-500">
-              {lastSyncTime ? `Đã đồng bộ lúc ${new Date(lastSyncTime).toLocaleTimeString()}` : 'Sẵn sàng'}
+            <label className="text-xs text-amber-300 font-bold flex items-center gap-1">
+              <Shield className="w-3.5 h-3.5" /> Dành Riêng Cho Ban Trọng Tài:
+            </label>
+            <span className="font-mono text-xs font-bold bg-amber-950 text-amber-300 px-2 py-0.5 rounded border border-amber-700">
+              PIN: {state.refereePin || '8888'}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            Khi deploy lên Vercel, ứng dụng tự động đồng bộ kết quả giữa điện thoại của trọng tài và điện thoại của tất cả khán giả cùng lúc!
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={refereeUrl}
+              className="bg-slate-900 border border-slate-700 text-xs text-slate-300 font-mono rounded-lg px-2.5 py-1.5 w-full focus:outline-none select-all truncate"
+            />
+            <button
+              onClick={handleCopyReferee}
+              className="inline-flex items-center gap-1 bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 transition-all active:scale-95 shadow-md"
+            >
+              {copiedReferee ? (
+                <>
+                  <Check className="w-3.5 h-3.5" /> Đã chép
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" /> Chép link BTC
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-400">
+            Link này tự động xác thực quyền Trọng tài (dành cho tổ trọng tài tại vạch đích).
           </p>
+        </div>
+
+        {/* Sync Status */}
+        <div className="text-[11px] text-slate-400 flex items-center justify-between px-1">
+          <span className="flex items-center gap-1 text-emerald-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            Đồng bộ Vercel Cloud Sync
+          </span>
+          <span>{lastSyncTime ? `Lúc ${new Date(lastSyncTime).toLocaleTimeString()}` : 'Sẵn sàng'}</span>
         </div>
 
         <button
