@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 import { RaceState } from '@/types/race';
 import { OFFICIAL_INDIVIDUAL_RUNNERS, OFFICIAL_TEAMS } from '@/data/officialRaceData';
+import { mergeRaceStates } from '@/utils/mergeRaceState';
 
 interface GlobalRaceStore {
   [roomCode: string]: {
@@ -32,13 +35,44 @@ const defaultInitialState: RaceState = {
   updatedAt: Date.now(),
 };
 
-// Pre-initialize server-side room RUN2026 with official participants
-const raceStore: GlobalRaceStore = {
-  RUN2026: {
-    state: defaultInitialState,
-    updatedAt: Date.now(),
+// Use globalThis to persist store across warm serverless invocations
+const globalForRace = globalThis as unknown as { __raceStore?: GlobalRaceStore };
+if (!globalForRace.__raceStore) {
+  globalForRace.__raceStore = {
+    RUN2026: {
+      state: defaultInitialState,
+      updatedAt: Date.now(),
+    }
+  };
+}
+const raceStore = globalForRace.__raceStore;
+
+// /tmp disk backup for cross-lambda resilience on Vercel
+function getTmpFilePath(roomCode: string) {
+  return path.join('/tmp', `race_${roomCode.toUpperCase()}.json`);
+}
+
+function loadStateFromDisk(roomCode: string): RaceState | null {
+  try {
+    const file = getTmpFilePath(roomCode);
+    if (fs.existsSync(file)) {
+      const raw = fs.readFileSync(file, 'utf-8');
+      return JSON.parse(raw);
+    }
+  } catch {
+    // ignore
   }
-};
+  return null;
+}
+
+function saveStateToDisk(roomCode: string, state: RaceState) {
+  try {
+    const file = getTmpFilePath(roomCode);
+    fs.writeFileSync(file, JSON.stringify(state), 'utf-8');
+  } catch {
+    // ignore
+  }
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -46,17 +80,26 @@ export async function GET(request: Request) {
 
   let entry = raceStore[roomCode];
   if (!entry) {
-    // If room is accessed for the first time, initialize with official data
-    const now = Date.now();
-    entry = {
-      state: {
-        ...defaultInitialState,
-        roomCode,
+    const diskState = loadStateFromDisk(roomCode);
+    if (diskState) {
+      entry = {
+        state: diskState,
+        updatedAt: diskState.updatedAt || Date.now(),
+      };
+      raceStore[roomCode] = entry;
+    } else {
+      const now = Date.now();
+      entry = {
+        state: {
+          ...defaultInitialState,
+          roomCode,
+          updatedAt: now,
+        },
         updatedAt: now,
-      },
-      updatedAt: now,
-    };
-    raceStore[roomCode] = entry;
+      };
+      raceStore[roomCode] = entry;
+      saveStateToDisk(roomCode, entry.state);
+    }
   }
 
   return NextResponse.json({
@@ -66,7 +109,8 @@ export async function GET(request: Request) {
     updatedAt: entry.updatedAt,
   }, {
     headers: {
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
     }
   });
 }
@@ -74,23 +118,49 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { roomCode, state } = body as { roomCode: string; state: RaceState };
+    const { roomCode, state: incomingState } = body as { roomCode: string; state: RaceState };
 
-    if (!roomCode || !state) {
+    if (!roomCode || !incomingState) {
       return NextResponse.json({ error: 'Missing roomCode or state' }, { status: 400 });
     }
 
     const code = roomCode.toUpperCase();
     const now = Date.now();
-    raceStore[code] = {
-      state: {
-        ...state,
+
+    // 1. Get current server state
+    let currentServerState = raceStore[code]?.state;
+    if (!currentServerState) {
+      currentServerState = loadStateFromDisk(code) || {
+        ...defaultInitialState,
+        roomCode: code,
         updatedAt: now,
-      },
+      };
+    }
+
+    // 2. Intelligently merge the incoming state with the current server state
+    // so no other referee's recorded finishes are lost!
+    const mergedState = mergeRaceStates(currentServerState, incomingState);
+    mergedState.updatedAt = now;
+
+    // 3. Persist merged state
+    raceStore[code] = {
+      state: mergedState,
       updatedAt: now,
     };
+    saveStateToDisk(code, mergedState);
 
-    return NextResponse.json({ success: true, roomCode: code, updatedAt: now });
+    // 4. Return merged state immediately to the caller
+    return NextResponse.json({
+      success: true,
+      roomCode: code,
+      state: mergedState,
+      updatedAt: now,
+    }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      }
+    });
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Internal error' }, { status: 500 });
   }

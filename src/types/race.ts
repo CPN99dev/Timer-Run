@@ -14,6 +14,7 @@ export interface IndividualRunner {
   elapsedMs: number | null; // Thời gian chạy thực tế
   adjustedElapsedMs: number | null; // Thời gian xếp hạng (Nữ × 0.85, Nam × 1.0)
   rank?: number;
+  updatedAt?: number;
 }
 
 export interface TeamMember {
@@ -25,6 +26,7 @@ export interface TeamMember {
   startTime: number | null;
   finishTime: number | null;
   elapsedMs: number | null;
+  updatedAt?: number;
 }
 
 export interface Team {

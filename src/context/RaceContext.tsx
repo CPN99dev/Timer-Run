@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { RaceState, IndividualRunner, Team, TeamMember, UserRole, RunnerStatus } from '@/types/race';
 import { sound, triggerHaptic } from '@/utils/audio';
 import { OFFICIAL_INDIVIDUAL_RUNNERS, OFFICIAL_TEAMS } from '@/data/officialRaceData';
+import { mergeRaceStates } from '@/utils/mergeRaceState';
 
 const STORAGE_KEY = 'race_timer_state_v5';
 const REFEREE_AUTH_KEY = 'race_referee_auth_v1';
@@ -86,6 +87,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
 
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const lastBroadcastStateRef = useRef<string>('');
+  const lastPushedStateRef = useRef<string>('');
 
   // 1. Initialize from URL params and localStorage on client mount
   useEffect(() => {
@@ -160,8 +162,14 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       bc.onmessage = (event) => {
         if (event.data && event.data.type === 'SYNC_STATE') {
           const incoming = event.data.state as RaceState;
-          if (incoming && incoming.updatedAt > (state.updatedAt || 0)) {
-            setState(incoming);
+          if (incoming) {
+            setState(prev => {
+              const merged = mergeRaceStates(prev, incoming);
+              const str = JSON.stringify(merged);
+              lastPushedStateRef.current = str;
+              lastBroadcastStateRef.current = str;
+              return str === JSON.stringify(prev) ? prev : merged;
+            });
           }
         }
       };
@@ -187,7 +195,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
   const pushStateToServer = useCallback(async (stateToPush: RaceState) => {
     try {
       setIsOnlineSyncActive(true);
-      await fetch('/api/race/sync', {
+      const res = await fetch('/api/race/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -195,6 +203,18 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           state: stateToPush,
         }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.state) {
+          setState(prev => {
+            const merged = mergeRaceStates(prev, data.state);
+            const str = JSON.stringify(merged);
+            lastPushedStateRef.current = str;
+            lastBroadcastStateRef.current = str;
+            return str === JSON.stringify(prev) ? prev : merged;
+          });
+        }
+      }
       setLastSyncTime(Date.now());
     } catch (err) {
       console.warn('API sync warn:', err);
@@ -203,7 +223,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Broadcast state updates
+  // Broadcast state updates to BroadcastChannel & Server
   useEffect(() => {
     const serialized = JSON.stringify(state);
     if (serialized !== lastBroadcastStateRef.current) {
@@ -214,39 +234,59 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         state,
       });
 
-      if (role === 'referee') {
+      if (role === 'referee' && serialized !== lastPushedStateRef.current) {
+        lastPushedStateRef.current = serialized;
         pushStateToServer(state);
       }
     }
   }, [state, role, pushStateToServer]);
 
-  // 4. Viewer Polling Sync (if in viewer role)
+  // 4. Multi-Referee & Viewer Bidirectional Real-time Polling Sync
+  // Runs for ALL roles (BOTH Referees and Viewers!) to ensure all 4 referees sync instantly in real time
   useEffect(() => {
-    if (role !== 'viewer') return;
-
     let isMounted = true;
+    let isFetching = false;
+
     const fetchLatest = async () => {
+      if (isFetching) return;
+      isFetching = true;
       try {
-        const res = await fetch(`/api/race/sync?room=${encodeURIComponent(state.roomCode)}`);
+        const res = await fetch(`/api/race/sync?room=${encodeURIComponent(state.roomCode)}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          }
+        });
         if (res.ok) {
           const data = await res.json();
           if (isMounted && data.found && data.state) {
-            setState(data.state);
+            setState(prev => {
+              const merged = mergeRaceStates(prev, data.state);
+              const str = JSON.stringify(merged);
+              lastPushedStateRef.current = str;
+              lastBroadcastStateRef.current = str;
+              return str === JSON.stringify(prev) ? prev : merged;
+            });
             setLastSyncTime(Date.now());
           }
         }
       } catch {
         // silent catch on network hiccups
+      } finally {
+        isFetching = false;
       }
     };
 
     fetchLatest();
-    const interval = setInterval(fetchLatest, 1500); // 1.5s live polling
+    // Fast live polling: 400ms when race is running or for referees, 1200ms when idle
+    const pollInterval = (state.isStarted || role === 'referee') ? 400 : 1200;
+    const interval = setInterval(fetchLatest, pollInterval);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [role, state.roomCode]);
+  }, [role, state.roomCode, state.isStarted]);
 
   // --- PERMISSION ACTIONS ---
 
@@ -639,6 +679,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         finishTime: null,
         elapsedMs: null,
         adjustedElapsedMs: null,
+        updatedAt: now,
       })),
       teams: prev.teams.map(t => ({
         ...t,
@@ -652,6 +693,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           startTime: now,
           finishTime: null,
           elapsedMs: null,
+          updatedAt: now,
         })) as [TeamMember, TeamMember, TeamMember],
       })),
       updatedAt: now,
@@ -684,6 +726,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         finishTime: null,
         elapsedMs: null,
         adjustedElapsedMs: null,
+        updatedAt: now,
       })),
       updatedAt: now,
     }));
@@ -720,6 +763,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           startTime: now,
           finishTime: null,
           elapsedMs: null,
+          updatedAt: now,
         })) as [TeamMember, TeamMember, TeamMember],
       })),
       updatedAt: now,
@@ -751,6 +795,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
             finishTime: now,
             elapsedMs: elapsed,
             adjustedElapsedMs: adjustedElapsed,
+            updatedAt: now,
           };
         }
         return r;
@@ -808,6 +853,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
               status: 'finished' as RunnerStatus,
               finishTime: now,
               elapsedMs: elapsed,
+              updatedAt: now,
             };
           }
           return m;
@@ -923,14 +969,14 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       const now = Date.now();
       const updatedInd = prev.individualRunners.map(r => {
         if (r.bib.toUpperCase() === cleanBib) {
-          return { ...r, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null };
+          return { ...r, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null, updatedAt: now };
         }
         return r;
       });
       const updatedTeams = prev.teams.map(t => {
         const updatedMembers = t.members.map(m => {
           if (m.bib.toUpperCase() === cleanBib) {
-            return { ...m, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null };
+            return { ...m, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null, updatedAt: now };
           }
           return m;
         }) as [TeamMember, TeamMember, TeamMember];
@@ -976,6 +1022,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
                 finishTime: action.previousFinishTime,
                 elapsedMs: null,
                 adjustedElapsedMs: null,
+                updatedAt: now,
               };
             }
             return r;
@@ -997,6 +1044,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
                   status: action.previousStatus,
                   finishTime: action.previousFinishTime,
                   elapsedMs: null,
+                  updatedAt: now,
                 };
               }
               return m;
@@ -1047,6 +1095,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         finishTime: null,
         elapsedMs: null,
         adjustedElapsedMs: null,
+        updatedAt: now,
       })),
       teams: prev.teams.map(t => ({
         ...t,
@@ -1060,6 +1109,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           startTime: null,
           finishTime: null,
           elapsedMs: null,
+          updatedAt: now,
         })) as [TeamMember, TeamMember, TeamMember],
       })),
       updatedAt: now,
