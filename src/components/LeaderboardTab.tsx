@@ -3,10 +3,18 @@
 import React, { useState, useMemo } from 'react';
 import { useRace } from '@/context/RaceContext';
 import { formatElapsed, formatTimeOfDay } from '@/utils/time';
-import { exportIndividualCSV, exportTeamCSV, exportAllResultsCSV } from '@/utils/csv';
+import {
+  exportIndividualCSV,
+  exportTeamCSV,
+  exportAllResultsCSV,
+  exportIndividualExcel,
+  exportTeamExcel,
+  exportAllResultsExcel
+} from '@/utils/csv';
 import {
   Trophy,
   Download,
+  FileSpreadsheet,
   Users,
   User,
   Search,
@@ -156,8 +164,25 @@ export default function LeaderboardTab() {
           </button>
         </div>
 
-        {/* Export CSV buttons */}
-        <div className="flex items-center gap-2">
+        {/* Export buttons: Excel (.xlsx) & CSV */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Main Excel .xlsx Export */}
+          <button
+            onClick={() => {
+              if (boardType === 'individual') {
+                exportIndividualExcel(state.individualRunners, state.raceName);
+              } else {
+                exportTeamExcel(state.teams, state.raceName);
+              }
+            }}
+            className="inline-flex items-center justify-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white text-xs font-bold py-2 px-3.5 rounded-xl border border-emerald-500/50 shadow-md shadow-emerald-950/40 transition-all"
+            title="Xuất file Excel (.xlsx) nguyên bản - Mở ra tự động tách cột chuẩn 100%"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+            Xuất Excel (.xlsx)
+          </button>
+
+          {/* CSV Export */}
           <button
             onClick={() => {
               if (boardType === 'individual') {
@@ -166,20 +191,21 @@ export default function LeaderboardTab() {
                 exportTeamCSV(state.teams, state.raceName);
               }
             }}
-            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold py-2 px-3 rounded-xl border border-slate-700 active:scale-95 transition-all"
-            title="Xuất bảng hiện tại ra file CSV tương thích Excel"
+            className="inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-semibold py-2 px-3 rounded-xl border border-slate-700 transition-all"
+            title="Xuất file CSV (đã đính kèm chỉ thị sep=, và UTF-8 BOM cho Excel)"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-400" />
-            Xuất CSV {boardType === 'individual' ? 'Cá Nhân' : 'Đồng Đội'}
+            <Download className="w-3.5 h-3.5 text-slate-400" />
+            Xuất CSV
           </button>
 
+          {/* Export All (Excel / CSV) */}
           <button
-            onClick={() => exportAllResultsCSV(state.individualRunners, state.teams, state.raceName)}
-            className="inline-flex items-center justify-center gap-1.5 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 text-xs font-bold py-2 px-3 rounded-xl border border-emerald-700 active:scale-95 transition-all"
-            title="Xuất cả 2 bảng ra 1 file CSV"
+            onClick={() => exportAllResultsExcel(state.individualRunners, state.teams, state.raceName)}
+            className="inline-flex items-center justify-center gap-1.5 bg-teal-950 hover:bg-teal-900 active:scale-95 text-teal-300 text-xs font-bold py-2 px-3 rounded-xl border border-teal-700 transition-all"
+            title="Xuất tất cả kết quả 2 bảng vào 1 file Excel (gồm 2 Sheet riêng biệt)"
           >
-            <Download className="w-3.5 h-3.5" />
-            Xuất Tất Cả
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Xuất Tất Cả (2 Sheet)
           </button>
         </div>
       </div>
