@@ -92,11 +92,11 @@ export default function TimerTab() {
       {/* Undo Banner if an action was just recorded */}
       {state.lastFinishedAction && (
         <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 text-white p-3.5 rounded-2xl border border-emerald-500/40 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2.5 truncate">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
-            <div className="truncate">
+            <div className="min-w-0 flex-1">
               <span className="text-xs text-emerald-300 block font-medium">Vừa ghi nhận về đích:</span>
-              <span className="text-sm font-bold truncate">
+              <span className="text-sm font-bold block break-words">
                 #{state.lastFinishedAction.bib} - {state.lastFinishedAction.runnerName}
               </span>
             </div>
@@ -205,13 +205,13 @@ export default function TimerTab() {
                     key={r.id}
                     className="bg-slate-950/90 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3 transition-all"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="font-mono text-base font-black px-2.5 py-1.5 rounded-lg bg-emerald-950/70 border border-emerald-800 text-emerald-400 shrink-0">
                         #{r.bib}
                       </div>
-                      <div className="truncate">
-                        <div className="text-sm font-bold text-white truncate flex items-center gap-2">
-                          <span className="truncate">{r.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-white flex flex-wrap items-center gap-1.5">
+                          <span className="break-words">{r.name}</span>
                           {r.company && (
                             <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                               {r.company}
@@ -219,13 +219,13 @@ export default function TimerTab() {
                           )}
                         </div>
                         {r.slogan && (
-                          <div className="text-[11px] text-amber-300/80 italic truncate mt-0.5">
+                          <div className="text-[11px] text-amber-300/80 italic mt-0.5 break-words">
                             "{r.slogan}"
                           </div>
                         )}
-                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                        <div className="text-xs text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
                           <span className="flex items-center gap-1">
-                            <User className="w-3 h-3 text-slate-500" /> Cá nhân
+                            <User className="w-3 h-3 text-slate-500 shrink-0" /> Cá nhân
                           </span>
                           <span>•</span>
                           <span className="text-slate-300 font-medium">{r.gender || 'Nam'}</span>
@@ -273,13 +273,13 @@ export default function TimerTab() {
                     key={member.id}
                     className="bg-slate-950/90 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3 transition-all"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="font-mono text-base font-black px-2.5 py-1.5 rounded-lg bg-teal-950/70 border border-teal-800 text-teal-300 shrink-0">
                         #{member.bib}
                       </div>
-                      <div className="truncate">
-                        <div className="text-sm font-bold text-white truncate flex items-center gap-2">
-                          <span className="truncate">{member.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-white flex flex-wrap items-center gap-1.5">
+                          <span className="break-words">{member.name}</span>
                           {member.roleInTeam && (
                             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
                               member.roleInTeam === 'Leader'
@@ -291,12 +291,12 @@ export default function TimerTab() {
                           )}
                         </div>
                         {team.slogan && (
-                          <div className="text-[11px] text-teal-300/80 italic truncate mt-0.5">
+                          <div className="text-[11px] text-teal-300/80 italic mt-0.5 break-words">
                             "{team.slogan}"
                           </div>
                         )}
-                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                          <span className="flex items-center gap-1 text-teal-400 font-medium truncate">
+                        <div className="text-xs text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
+                          <span className="flex items-center gap-1 text-teal-400 font-medium">
                             <Users className="w-3 h-3 shrink-0" /> {team.teamName}
                           </span>
                           <span>•</span>

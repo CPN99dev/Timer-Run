@@ -226,13 +226,13 @@ export default function SetupTab() {
               <div className="divide-y divide-slate-800/80">
                 {state.individualRunners.map((runner) => (
                   <div key={runner.id} className="py-2.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <span className="font-mono font-bold text-sm bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-lg border border-slate-700 shrink-0">
                         #{runner.bib}
                       </span>
-                      <div className="truncate">
-                        <div className="text-sm font-semibold text-white truncate flex items-center gap-2">
-                          <span className="truncate">{runner.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-white flex flex-wrap items-center gap-2">
+                          <span className="break-words">{runner.name}</span>
                           {runner.company && (
                             <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                               {runner.company}
@@ -240,11 +240,11 @@ export default function SetupTab() {
                           )}
                         </div>
                         {runner.slogan && (
-                          <div className="text-[11px] text-amber-300/80 italic truncate">
+                          <div className="text-[11px] text-amber-300/80 italic break-words mt-0.5">
                             "{runner.slogan}"
                           </div>
                         )}
-                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                        <div className="text-xs text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
                           <span>{runner.gender || 'Nam'}</span>
                           <span>•</span>
                           <span className={
@@ -440,10 +440,10 @@ export default function SetupTab() {
                     key={team.id}
                     className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 truncate">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2 min-w-0 flex-1">
                         <Users className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span className="text-sm font-bold text-white truncate">{team.teamName}</span>
+                        <span className="text-sm font-bold text-white break-words">{team.teamName}</span>
                         {team.company && team.company !== team.teamName && (
                           <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                             {team.company}
@@ -466,7 +466,7 @@ export default function SetupTab() {
                     </div>
 
                     {team.slogan && (
-                      <div className="text-[11px] text-teal-300/80 italic -mt-1 truncate">
+                      <div className="text-[11px] text-teal-300/80 italic -mt-1 break-words">
                         "{team.slogan}"
                       </div>
                     )}
@@ -478,9 +478,9 @@ export default function SetupTab() {
                           key={member.id}
                           className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs gap-1.5"
                         >
-                          <div className="flex items-center gap-1.5 truncate">
+                          <div className="flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
                             <span className="font-mono font-bold text-emerald-400 shrink-0">#{member.bib}</span>
-                            <span className="text-slate-200 truncate">{member.name}</span>
+                            <span className="text-slate-200 break-words">{member.name}</span>
                             {member.roleInTeam && (
                               <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
                                 member.roleInTeam === 'Leader'

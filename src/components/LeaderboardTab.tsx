@@ -277,16 +277,16 @@ export default function LeaderboardTab() {
                     }`}
                   >
                     {/* Rank & Runner Info */}
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="shrink-0">{getRankBadge(index, isFinished)}</div>
 
                       <div className="font-mono text-sm font-black px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 text-emerald-400 shrink-0">
                         #{runner.bib}
                       </div>
 
-                      <div className="truncate">
-                        <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
-                          <span className="truncate">{runner.name}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-white flex flex-wrap items-center gap-1.5">
+                          <span className="break-words">{runner.name}</span>
                           {runner.company && (
                             <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                               {runner.company}
@@ -298,7 +298,7 @@ export default function LeaderboardTab() {
                                 e.stopPropagation();
                                 setEditingTarget({ type: 'individual', runner });
                               }}
-                              className="text-slate-500 hover:text-emerald-400 p-0.5 rounded transition-colors"
+                              className="text-slate-500 hover:text-emerald-400 p-0.5 rounded transition-colors shrink-0"
                               title="Sửa thông tin VĐV"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
@@ -311,11 +311,11 @@ export default function LeaderboardTab() {
                           )}
                         </div>
                         {runner.slogan && (
-                          <div className="text-[11px] text-amber-300/80 italic truncate">
+                          <div className="text-[11px] text-amber-300/80 italic break-words mt-0.5">
                             "{runner.slogan}"
                           </div>
                         )}
-                        <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                        <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
                           <span className={isFemale ? 'text-pink-300 font-semibold' : 'text-slate-300'}>
                             {runner.gender || 'Nam'}
                           </span>
@@ -405,13 +405,13 @@ export default function LeaderboardTab() {
                       onClick={() => toggleTeamExpand(team.id)}
                       className="p-3.5 flex items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-800/30"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="shrink-0">{getRankBadge(index, isAllFinished)}</div>
 
-                        <div className="truncate">
-                          <div className="text-sm font-bold text-white flex items-center gap-1.5 truncate">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold text-white flex flex-wrap items-center gap-1.5">
                             <Users className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span className="truncate">{team.teamName}</span>
+                            <span className="break-words">{team.teamName}</span>
                             {team.company && team.company !== team.teamName && (
                               <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 shrink-0">
                                 {team.company}
@@ -419,11 +419,11 @@ export default function LeaderboardTab() {
                             )}
                           </div>
                           {team.slogan && (
-                            <div className="text-[11px] text-teal-300/80 italic truncate mt-0.5">
+                            <div className="text-[11px] text-teal-300/80 italic mt-0.5 break-words">
                               "{team.slogan}"
                             </div>
                           )}
-                          <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                          <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
                             <span className={
                               isAllFinished ? 'text-emerald-400 font-semibold' : 'text-amber-400'
                             }>
@@ -474,11 +474,11 @@ export default function LeaderboardTab() {
                             key={m.id}
                             className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-xs gap-1.5"
                           >
-                            <div className="truncate pr-1 flex items-center gap-1">
+                            <div className="pr-1 flex flex-wrap items-center gap-1 min-w-0 flex-1">
                               <span className="font-mono font-bold text-emerald-400 mr-1 shrink-0">
                                 #{m.bib}
                               </span>
-                              <span className="text-slate-200 truncate">{m.name}</span>
+                              <span className="text-slate-200 break-words">{m.name}</span>
                               {m.roleInTeam && (
                                 <span className={`text-[9px] font-semibold px-1 py-0.2 rounded border shrink-0 ${
                                   m.roleInTeam === 'Leader'
