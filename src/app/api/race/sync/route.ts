@@ -77,6 +77,7 @@ function saveStateToDisk(roomCode: string, state: RaceState) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const roomCode = (searchParams.get('room') || 'RUN2026').toUpperCase();
+  const since = parseInt(searchParams.get('since') || '0', 10);
 
   let entry = raceStore[roomCode];
   if (!entry) {
@@ -102,8 +103,24 @@ export async function GET(request: Request) {
     }
   }
 
+  // If client provided a 'since' timestamp and nothing changed, return lightweight response
+  if (since > 0 && entry.updatedAt <= since) {
+    return NextResponse.json({
+      found: true,
+      changed: false,
+      roomCode,
+      updatedAt: entry.updatedAt,
+    }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+      }
+    });
+  }
+
   return NextResponse.json({
     found: true,
+    changed: true,
     roomCode,
     state: entry.state,
     updatedAt: entry.updatedAt,
