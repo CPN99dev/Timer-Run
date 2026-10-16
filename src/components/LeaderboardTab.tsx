@@ -6,7 +6,6 @@ import { formatElapsed, formatTimeOfDay } from '@/utils/time';
 import { exportIndividualCSV, exportTeamCSV, exportAllResultsCSV } from '@/utils/csv';
 import {
   Trophy,
-  Medal,
   Download,
   Users,
   User,
@@ -37,12 +36,14 @@ export default function LeaderboardTab() {
     });
   };
 
-  // Sorted individual rankings
+  // Sorted individual rankings: sorted by adjustedElapsedMs (Female x 0.85, Male x 1.0)
   const sortedIndividuals = useMemo(() => {
     const list = [...state.individualRunners];
     return list.sort((a, b) => {
       if (a.status === 'finished' && b.status === 'finished') {
-        return (a.elapsedMs || 0) - (b.elapsedMs || 0);
+        const timeA = a.adjustedElapsedMs ?? a.elapsedMs ?? 0;
+        const timeB = b.adjustedElapsedMs ?? b.elapsedMs ?? 0;
+        return timeA - timeB;
       }
       if (a.status === 'finished') return -1;
       if (b.status === 'finished') return 1;
@@ -62,13 +63,18 @@ export default function LeaderboardTab() {
     );
   }, [sortedIndividuals, searchQuery]);
 
-  // Sorted team rankings (ranked by averageElapsedMs)
+  // Sorted team rankings: sorted by totalElapsedMs, tie-breaker by bestMemberElapsedMs
   const sortedTeams = useMemo(() => {
     const list = [...state.teams];
     return list.sort((a, b) => {
-      // Both completed 3/3: compare averageElapsedMs
+      // Both completed 3/3: compare totalElapsedMs, tie-breaker bestMemberElapsedMs
       if (a.finishedCount === 3 && b.finishedCount === 3) {
-        return (a.averageElapsedMs || 0) - (b.averageElapsedMs || 0);
+        const totalA = a.totalElapsedMs || 0;
+        const totalB = b.totalElapsedMs || 0;
+        if (totalA !== totalB) {
+          return totalA - totalB;
+        }
+        return (a.bestMemberElapsedMs || 0) - (b.bestMemberElapsedMs || 0);
       }
       // Completed more members comes first
       if (a.finishedCount !== b.finishedCount) {
@@ -193,14 +199,19 @@ export default function LeaderboardTab() {
       {/* ================= INDIVIDUAL LEADERBOARD ================= */}
       {boardType === 'individual' && (
         <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-amber-400" />
-              Bảng Xếp Hạng Cá Nhân ({filteredIndividuals.length} VĐV)
-            </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <Trophy className="w-4 h-4 text-amber-400" />
+                Bảng Xếp Hạng Cá Nhân ({filteredIndividuals.length} VĐV)
+              </h3>
+              <p className="text-[11px] text-pink-300/80 mt-0.5">
+                * Quy định điều lệ: Vận động viên Nữ được ưu tiên 15% (Thời gian xếp hạng = Thực tế × 0.85)
+              </p>
+            </div>
             <button
               onClick={triggerConfetti}
-              className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-medium"
+              className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-medium shrink-0 self-start sm:self-auto"
             >
               <Sparkles className="w-3 h-3" /> Chúc mừng VĐV
             </button>
@@ -214,6 +225,7 @@ export default function LeaderboardTab() {
             <div className="space-y-2">
               {filteredIndividuals.map((runner, index) => {
                 const isFinished = runner.status === 'finished';
+                const isFemale = runner.gender === 'Nữ';
                 return (
                   <div
                     key={runner.id}
@@ -257,7 +269,9 @@ export default function LeaderboardTab() {
                           )}
                         </div>
                         <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                          <span>{runner.gender || 'Nam'}</span>
+                          <span className={isFemale ? 'text-pink-300 font-semibold' : 'text-slate-300'}>
+                            {runner.gender || 'Nam'}
+                          </span>
                           {runner.finishTime && (
                             <>
                               <span>•</span>
@@ -273,11 +287,17 @@ export default function LeaderboardTab() {
                       {isFinished ? (
                         <>
                           <div className="font-mono text-base font-black text-emerald-400">
-                            {formatElapsed(runner.elapsedMs, true)}
+                            {formatElapsed(runner.adjustedElapsedMs ?? runner.elapsedMs, true)}
                           </div>
-                          <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 font-medium">
-                            <CheckCircle2 className="w-3 h-3" /> Hoàn thành
-                          </span>
+                          {isFemale ? (
+                            <div className="text-[10px] text-pink-300 font-medium">
+                              -15% (Gốc: {formatElapsed(runner.elapsedMs)})
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 font-medium">
+                              <CheckCircle2 className="w-3 h-3" /> Hoàn thành
+                            </span>
+                          )}
                         </>
                       ) : runner.status === 'running' ? (
                         <div className="text-xs text-amber-400 font-medium flex items-center gap-1">
@@ -300,12 +320,14 @@ export default function LeaderboardTab() {
       {/* ================= TEAM LEADERBOARD ================= */}
       {boardType === 'team' && (
         <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
               <Trophy className="w-4 h-4 text-amber-400" />
               Bảng Xếp Hạng Đồng Đội ({filteredTeams.length} Đội)
             </h3>
-            <span className="text-[11px] text-emerald-400 font-medium">1 đội 3 người • Xếp hạng theo thời gian trung bình</span>
+            <span className="text-[11px] text-emerald-400 font-medium">
+              1 đội 3 người • Xếp hạng theo TỔNG thời gian 3 thành viên
+            </span>
           </div>
 
           {filteredTeams.length === 0 ? (
@@ -356,15 +378,17 @@ export default function LeaderboardTab() {
 
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right">
-                          <span className="text-[10px] text-slate-400 block font-medium">Thời gian TB của đội</span>
+                          <span className="text-[10px] text-slate-400 block font-medium">Tổng thời gian 3 VĐV</span>
                           {isAllFinished ? (
                             <>
                               <div className="font-mono text-base font-black text-emerald-400">
-                                {formatElapsed(team.averageElapsedMs, true)}
+                                {formatElapsed(team.totalElapsedMs, true)}
                               </div>
-                              <span className="text-[10px] text-slate-500 block">
-                                Tổng 3 VĐV: {formatElapsed(team.totalElapsedMs)}
-                              </span>
+                              {team.bestMemberElapsedMs && (
+                                <span className="text-[10px] text-slate-400 block">
+                                  Nhanh nhất: {formatElapsed(team.bestMemberElapsedMs)}
+                                </span>
+                              )}
                             </>
                           ) : (
                             <div className="text-xs text-amber-400 font-medium">
@@ -388,7 +412,7 @@ export default function LeaderboardTab() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        {team.members.map((m, mIdx) => (
+                        {team.members.map((m) => (
                           <div
                             key={m.id}
                             className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-xs gap-1.5"

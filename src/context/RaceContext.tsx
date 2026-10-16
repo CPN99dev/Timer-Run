@@ -322,6 +322,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       startTime: null,
       finishTime: null,
       elapsedMs: null,
+      adjustedElapsedMs: null,
     };
 
     setState(prev => ({
@@ -364,11 +365,16 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       individualRunners: prev.individualRunners.map(r => {
         if (r.id === id) {
+          const newGender = updates.gender || r.gender || 'Nam';
+          const newAdjustedElapsedMs = r.elapsedMs !== null
+            ? (newGender === 'Nữ' ? Math.round(r.elapsedMs * 0.85) : r.elapsedMs)
+            : r.adjustedElapsedMs;
           return {
             ...r,
             bib: cleanBib,
             name: cleanName,
-            gender: updates.gender || r.gender,
+            gender: newGender,
+            adjustedElapsedMs: newAdjustedElapsedMs,
           };
         }
         return r;
@@ -448,7 +454,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       members,
       status: 'not_started',
       totalElapsedMs: null,
-      averageElapsedMs: null,
+      bestMemberElapsedMs: null,
       finishedCount: 0,
     };
 
@@ -548,12 +554,12 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
   const loadSampleData = () => {
     if (state.isLocked) return;
     const sampleRunners: IndividualRunner[] = [
-      { id: 'ind-1', bib: '101', name: 'Nguyễn Văn Hùng', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-      { id: 'ind-2', bib: '102', name: 'Trần Thị Mai', gender: 'Nữ', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-      { id: 'ind-3', bib: '103', name: 'Lê Hoàng Nam', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-      { id: 'ind-4', bib: '104', name: 'Phạm Minh Đức', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-      { id: 'ind-5', bib: '105', name: 'Vũ Thuỳ Linh', gender: 'Nữ', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
-      { id: 'ind-6', bib: '106', name: 'Hoàng Anh Tuấn', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
+      { id: 'ind-1', bib: '101', name: 'Nguyễn Văn Hùng', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
+      { id: 'ind-2', bib: '102', name: 'Trần Thị Mai', gender: 'Nữ', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
+      { id: 'ind-3', bib: '103', name: 'Lê Hoàng Nam', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
+      { id: 'ind-4', bib: '104', name: 'Phạm Minh Đức', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
+      { id: 'ind-5', bib: '105', name: 'Vũ Thuỳ Linh', gender: 'Nữ', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
+      { id: 'ind-6', bib: '106', name: 'Hoàng Anh Tuấn', gender: 'Nam', category: 'individual', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null, adjustedElapsedMs: null },
     ];
 
     const sampleTeams: Team[] = [
@@ -563,7 +569,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         category: 'team',
         status: 'not_started',
         totalElapsedMs: null,
-        averageElapsedMs: null,
+        bestMemberElapsedMs: null,
         finishedCount: 0,
         members: [
           { id: 'tm-1-1', bib: 'T01', name: 'Đặng Quốc Huy', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
@@ -577,7 +583,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         category: 'team',
         status: 'not_started',
         totalElapsedMs: null,
-        averageElapsedMs: null,
+        bestMemberElapsedMs: null,
         finishedCount: 0,
         members: [
           { id: 'tm-2-1', bib: 'T04', name: 'Võ Minh Trí', status: 'not_started', startTime: null, finishTime: null, elapsedMs: null },
@@ -647,12 +653,13 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         startTime: now,
         finishTime: null,
         elapsedMs: null,
+        adjustedElapsedMs: null,
       })),
       teams: prev.teams.map(t => ({
         ...t,
         status: 'running',
         totalElapsedMs: null,
-        averageElapsedMs: null,
+        bestMemberElapsedMs: null,
         finishedCount: 0,
         members: t.members.map(m => ({
           ...m,
@@ -691,6 +698,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         startTime: now,
         finishTime: null,
         elapsedMs: null,
+        adjustedElapsedMs: null,
       })),
       updatedAt: now,
     }));
@@ -719,7 +727,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         ...t,
         status: 'running',
         totalElapsedMs: null,
-        averageElapsedMs: null,
+        bestMemberElapsedMs: null,
         finishedCount: 0,
         members: t.members.map(m => ({
           ...m,
@@ -748,6 +756,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
 
       const runnerStart = runner.startTime || state.individualStartTime || state.startTime || now;
       const elapsed = Math.max(0, now - runnerStart - state.totalPausedMs);
+      const adjustedElapsed = runner.gender === 'Nữ' ? Math.round(elapsed * 0.85) : elapsed;
 
       const updatedInd = state.individualRunners.map(r => {
         if (r.id === id) {
@@ -756,6 +765,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
             status: 'finished' as RunnerStatus,
             finishTime: now,
             elapsedMs: elapsed,
+            adjustedElapsedMs: adjustedElapsed,
           };
         }
         return r;
@@ -821,10 +831,11 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         const finishedCount = updatedMembers.filter(m => m.status === 'finished').length;
         const allFinished = finishedCount === 3;
         let totalElapsedMs: number | null = null;
-        let averageElapsedMs: number | null = null;
+        let bestMemberElapsedMs: number | null = null;
         if (allFinished) {
           totalElapsedMs = updatedMembers.reduce((sum, m) => sum + (m.elapsedMs || 0), 0);
-          averageElapsedMs = Math.round(totalElapsedMs / 3);
+          const validTimes = updatedMembers.map(m => m.elapsedMs).filter((t): t is number => t !== null);
+          bestMemberElapsedMs = validTimes.length > 0 ? Math.min(...validTimes) : null;
         }
 
         return {
@@ -833,7 +844,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           finishedCount,
           status: (allFinished ? 'finished' : 'running') as RunnerStatus,
           totalElapsedMs,
-          averageElapsedMs,
+          bestMemberElapsedMs,
         };
       });
 
@@ -979,6 +990,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
                 status: action.previousStatus,
                 finishTime: action.previousFinishTime,
                 elapsedMs: null,
+                adjustedElapsedMs: null,
               };
             }
             return r;
@@ -1012,7 +1024,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
               finishedCount,
               status: (finishedCount === 3 ? 'finished' : 'running') as RunnerStatus,
               totalElapsedMs: null,
-              averageElapsedMs: null,
+              bestMemberElapsedMs: null,
             };
           }),
           updatedAt: now,
@@ -1049,12 +1061,13 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         startTime: null,
         finishTime: null,
         elapsedMs: null,
+        adjustedElapsedMs: null,
       })),
       teams: prev.teams.map(t => ({
         ...t,
         status: 'not_started',
         totalElapsedMs: null,
-        averageElapsedMs: null,
+        bestMemberElapsedMs: null,
         finishedCount: 0,
         members: t.members.map(m => ({
           ...m,

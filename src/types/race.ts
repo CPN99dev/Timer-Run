@@ -9,7 +9,8 @@ export interface IndividualRunner {
   status: RunnerStatus;
   startTime: number | null; // epoch timestamp ms
   finishTime: number | null; // epoch timestamp ms
-  elapsedMs: number | null; // calculated duration
+  elapsedMs: number | null; // Thời gian chạy thực tế
+  adjustedElapsedMs: number | null; // Thời gian xếp hạng (Nữ × 0.85, Nam × 1.0)
   rank?: number;
 }
 
@@ -29,8 +30,8 @@ export interface Team {
   category: 'team';
   members: [TeamMember, TeamMember, TeamMember]; // exactly 3 runners
   status: RunnerStatus; // 'finished' when all 3 finish
-  totalElapsedMs: number | null; // sum of 3 members' elapsedMs
-  averageElapsedMs: number | null; // average of 3 members (primary ranking metric)
+  totalElapsedMs: number | null; // Tổng thời gian hoàn thành thực tế của 03 thành viên
+  bestMemberElapsedMs: number | null; // Thời gian của thành viên về nhanh nhất (xét khi bằng tổng thời gian)
   finishedCount: number; // 0, 1, 2, or 3
   rank?: number;
 }

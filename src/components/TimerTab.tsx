@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { useRace } from '@/context/RaceContext';
-import { formatElapsed } from '@/utils/time';
 import {
   CheckCircle,
   RotateCcw,
@@ -12,73 +11,20 @@ import {
   User,
   AlertCircle,
   Flame,
-  Delete,
-  Hash
+  Sparkles
 } from 'lucide-react';
 
 export default function TimerTab() {
   const {
     state,
-    recordFinishByBib,
     recordFinishById,
     undoLastFinish,
     markDNF,
     role
   } = useRace();
 
-  const [bibInput, setBibInput] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'individual' | 'team'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-
-  // Quick Numpad handler
-  const handleNumpadPress = (num: string) => {
-    setBibInput(prev => prev + num);
-  };
-
-  const handleNumpadBackspace = () => {
-    setBibInput(prev => prev.slice(0, -1));
-  };
-
-  const handleNumpadClear = () => {
-    setBibInput('');
-  };
-
-  const handleSubmitBib = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!bibInput.trim()) return;
-
-    const res = recordFinishByBib(bibInput);
-    if (res.success) {
-      setMessage({ text: res.message, type: 'success' });
-      setBibInput('');
-    } else {
-      setMessage({ text: res.message, type: 'error' });
-    }
-
-    setTimeout(() => {
-      setMessage(null);
-    }, 4500);
-  };
-
-  // Matched runner preview when typing BIB
-  const previewRunner = useMemo(() => {
-    const q = bibInput.trim().toUpperCase();
-    if (!q) return null;
-
-    const ind = state.individualRunners.find(r => r.bib.toUpperCase() === q);
-    if (ind) {
-      return { type: 'individual' as const, name: ind.name, bib: ind.bib, status: ind.status, sub: 'Bảng Cá nhân' };
-    }
-
-    for (const t of state.teams) {
-      const m = t.members.find(mem => mem.bib.toUpperCase() === q);
-      if (m) {
-        return { type: 'team' as const, name: m.name, bib: m.bib, status: m.status, sub: `Đội: ${t.teamName}` };
-      }
-    }
-    return null;
-  }, [bibInput, state.individualRunners, state.teams]);
 
   // Active individual runners
   const activeIndRunners = useMemo(() => {
@@ -130,15 +76,17 @@ export default function TimerTab() {
     return result;
   }, [activeIndRunners, activeTeamMembers, filterType, searchQuery]);
 
+  const totalActive = activeIndRunners.length + activeTeamMembers.length;
+
   return (
     <div className="space-y-4">
       {/* Undo Banner if an action was just recorded */}
       {state.lastFinishedAction && (
-        <div className="bg-gradient-to-r from-emerald-900 to-teal-900 text-white p-3.5 rounded-2xl border border-emerald-500/40 shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+        <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 text-white p-3.5 rounded-2xl border border-emerald-500/40 shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-2.5 truncate">
-            <CheckCircle className="w-5 h-5 text-emerald-300 shrink-0" />
+            <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
             <div className="truncate">
-              <span className="text-xs text-emerald-200 block font-medium">Vừa ghi nhận về đích:</span>
+              <span className="text-xs text-emerald-300 block font-medium">Vừa ghi nhận về đích:</span>
               <span className="text-sm font-bold truncate">
                 #{state.lastFinishedAction.bib} - {state.lastFinishedAction.runnerName}
               </span>
@@ -162,156 +110,50 @@ export default function TimerTab() {
           <AlertCircle className="w-6 h-6 text-amber-400 shrink-0" />
           <div className="text-xs">
             <p className="font-bold text-sm text-amber-300">Giải chạy chưa xuất phát!</p>
-            Vui lòng nhấn nút <span className="font-bold underline">"BẮT ĐẦU GIẢI CHẠY (MASS START)"</span> ở trên đồng hồ để khởi động tính giờ trước khi bấm về đích.
-          </div>
-        </div>
-      )}
-
-      {/* QUICK BIB NUMPAD & INPUT CONSOLE */}
-      {role === 'referee' && state.isStarted && (
-        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <Hash className="w-4 h-4 text-emerald-400" />
-              Bấm Số BIB Về Đích Nhanh
-            </h3>
-            <span className="text-[11px] text-slate-500">Bấm số hoặc gõ phím</span>
-          </div>
-
-          {/* Input display & Action button */}
-          <form onSubmit={handleSubmitBib} className="space-y-2">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  inputMode="text"
-                  placeholder="Nhập số BIB..."
-                  value={bibInput}
-                  onChange={e => setBibInput(e.target.value)}
-                  className="w-full bg-slate-950 border-2 border-slate-700 focus:border-emerald-500 rounded-xl px-4 py-3 text-2xl font-mono font-bold text-white tracking-widest placeholder-slate-600 text-center"
-                />
-                {bibInput && (
-                  <button
-                    type="button"
-                    onClick={handleNumpadClear}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
-                  >
-                    <Delete className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={!bibInput.trim()}
-                className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 active:scale-95 text-white font-bold px-5 py-3 rounded-xl transition-all shadow-lg flex items-center gap-2 text-base shrink-0"
-              >
-                <Flag className="w-5 h-5 fill-current" />
-                VỀ ĐÍCH
-              </button>
-            </div>
-
-            {/* Preview matched runner */}
-            {previewRunner && (
-              <div className={`p-2.5 rounded-xl text-xs flex items-center justify-between border ${
-                previewRunner.status === 'finished'
-                  ? 'bg-amber-950/50 border-amber-800 text-amber-200'
-                  : 'bg-emerald-950/50 border-emerald-800 text-emerald-200'
-              }`}>
-                <div>
-                  <span className="font-bold text-sm">#{previewRunner.bib}</span> - {previewRunner.name}
-                  <span className="text-[11px] opacity-80 block">{previewRunner.sub}</span>
-                </div>
-                <span className="font-semibold text-xs px-2 py-0.5 rounded bg-black/30">
-                  {previewRunner.status === 'finished' ? 'Đã về đích' : 'Đang chạy'}
-                </span>
-              </div>
-            )}
-
-            {/* Notification message */}
-            {message && (
-              <div className={`p-2.5 rounded-xl text-xs font-semibold ${
-                message.type === 'success'
-                  ? 'bg-emerald-950/80 border border-emerald-700 text-emerald-300'
-                  : 'bg-rose-950/80 border border-rose-700 text-rose-300'
-              }`}>
-                {message.text}
-              </div>
-            )}
-          </form>
-
-          {/* On-screen Touch Numpad for mobile referee */}
-          <div className="grid grid-cols-3 gap-1.5 pt-1">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => handleNumpadPress(num)}
-                className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-mono text-xl font-bold py-2.5 rounded-xl border border-slate-700 transition-all select-none"
-              >
-                {num}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleNumpadClear}
-              className="bg-slate-800/60 hover:bg-slate-800 text-slate-400 text-xs font-semibold py-2.5 rounded-xl border border-slate-700/60"
-            >
-              Xoá
-            </button>
-            <button
-              type="button"
-              onClick={() => handleNumpadPress('0')}
-              className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white font-mono text-xl font-bold py-2.5 rounded-xl border border-slate-700"
-            >
-              0
-            </button>
-            <button
-              type="button"
-              onClick={handleNumpadBackspace}
-              className="bg-slate-800/60 hover:bg-slate-800 text-slate-400 flex items-center justify-center py-2.5 rounded-xl border border-slate-700/60"
-            >
-              <Delete className="w-5 h-5" />
-            </button>
+            Vui lòng nhấn nút <span className="font-bold underline text-amber-100">"XUẤT PHÁT CHUNG"</span> hoặc xuất phát riêng từng bảng ở khung đồng hồ phía trên để bắt đầu tính giờ.
           </div>
         </div>
       )}
 
       {/* LIST OF RUNNERS CURRENTLY ON THE COURSE */}
-      <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-xl space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Flame className="w-4 h-4 text-amber-400" />
-              Đang Chạy Trên Đường Đua ({activeIndRunners.length + activeTeamMembers.length})
+              Đang Chạy Trên Đường Đua ({totalActive})
             </h3>
-            <p className="text-xs text-slate-400">
-              Chạm trực tiếp nút <span className="text-emerald-400 font-bold">VỀ ĐÍCH</span> của VĐV khi họ cán đích
+            <p className="text-xs text-slate-400 mt-0.5">
+              {role === 'referee' ? (
+                <>Chạm nút <span className="text-emerald-400 font-bold">VỀ ĐÍCH</span> của VĐV khi họ cán đích</>
+              ) : (
+                'Danh sách vận động viên đang trên đường chạy'
+              )}
             </p>
           </div>
 
           {/* Filter Pills */}
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs shrink-0">
             <button
               onClick={() => setFilterType('all')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                filterType === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400'
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                filterType === 'all' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Tất cả
+              Tất cả ({totalActive})
             </button>
             <button
               onClick={() => setFilterType('individual')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                filterType === 'individual' ? 'bg-slate-800 text-white' : 'text-slate-400'
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                filterType === 'individual' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Cá nhân ({activeIndRunners.length})
             </button>
             <button
               onClick={() => setFilterType('team')}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-all ${
-                filterType === 'team' ? 'bg-slate-800 text-white' : 'text-slate-400'
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                filterType === 'team' ? 'bg-slate-800 text-white shadow' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Đồng đội ({activeTeamMembers.length})
@@ -319,52 +161,63 @@ export default function TimerTab() {
           </div>
         </div>
 
-        {/* Search input */}
+        {/* Quick Search */}
         <div className="relative">
           <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Tìm theo số BIB hoặc tên VĐV..."
+            placeholder="Tìm nhanh theo số BIB hoặc tên VĐV..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
 
         {/* Runner Cards Grid */}
         {filteredActiveRunners.length === 0 ? (
-          <div className="text-center py-10 text-slate-500 text-sm">
-            {state.isStarted
-              ? 'Tất cả vận động viên đã hoàn thành cuộc đua! Xem bảng xếp hạng ở tab bên cạnh.'
-              : 'Chưa có vận động viên nào đang chạy.'}
+          <div className="text-center py-12 text-slate-500 text-sm bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+            {state.isStarted ? (
+              <div>
+                <p className="font-semibold text-slate-400">Tất cả vận động viên đã hoàn thành cuộc đua! 🎉</p>
+                <p className="text-xs text-slate-500 mt-1">Chuyển sang tab Bảng Xếp Hạng để xem kết quả chi tiết.</p>
+              </div>
+            ) : (
+              'Chưa có vận động viên nào đang chạy trên đường đua.'
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-2.5">
             {filteredActiveRunners.map(item => {
               if (item.type === 'ind') {
                 const r = item.data;
+                const isFemale = r.gender === 'Nữ';
                 return (
                   <div
                     key={r.id}
-                    className="bg-slate-950/80 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3 transition-all"
+                    className="bg-slate-950/90 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3 transition-all"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="font-mono text-base font-black px-2.5 py-1.5 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-400 shrink-0">
+                      <div className="font-mono text-base font-black px-2.5 py-1.5 rounded-lg bg-emerald-950/70 border border-emerald-800 text-emerald-400 shrink-0">
                         #{r.bib}
                       </div>
                       <div className="truncate">
                         <div className="text-sm font-bold text-white truncate">{r.name}</div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3 text-slate-500" /> Cá nhân
                           </span>
                           <span>•</span>
-                          <span>{r.gender || 'Nam'}</span>
+                          <span className="text-slate-300 font-medium">{r.gender || 'Nam'}</span>
+                          {isFemale && (
+                            <span className="text-[10px] bg-pink-950 text-pink-300 px-1.5 py-0.2 rounded border border-pink-800/60 flex items-center gap-0.5">
+                              <Sparkles className="w-2.5 h-2.5" /> -15%
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    {role === 'referee' && state.isStarted && (
+                    {role === 'referee' && state.isStarted ? (
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => recordFinishById(r.id, 'individual')}
@@ -385,6 +238,10 @@ export default function TimerTab() {
                           DNF
                         </button>
                       </div>
+                    ) : (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 shrink-0">
+                        Đang chạy
+                      </span>
                     )}
                   </div>
                 );
@@ -393,27 +250,27 @@ export default function TimerTab() {
                 return (
                   <div
                     key={member.id}
-                    className="bg-slate-950/80 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3 transition-all"
+                    className="bg-slate-950/90 border border-slate-800 hover:border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3 transition-all"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="font-mono text-base font-black px-2.5 py-1.5 rounded-lg bg-teal-950/60 border border-teal-800 text-teal-300 shrink-0">
+                      <div className="font-mono text-base font-black px-2.5 py-1.5 rounded-lg bg-teal-950/70 border border-teal-800 text-teal-300 shrink-0">
                         #{member.bib}
                       </div>
                       <div className="truncate">
                         <div className="text-sm font-bold text-white truncate">{member.name}</div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
                           <span className="flex items-center gap-1 text-teal-400 font-medium">
                             <Users className="w-3 h-3" /> {team.teamName}
                           </span>
                           <span>•</span>
-                          <span className="text-slate-500">
-                            (Đội đã về {team.finishedCount}/3)
+                          <span className="text-slate-400">
+                            (Đã về {team.finishedCount}/3)
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {role === 'referee' && state.isStarted && (
+                    {role === 'referee' && state.isStarted ? (
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => recordFinishById(member.id, 'team_member', team.id)}
@@ -434,6 +291,10 @@ export default function TimerTab() {
                           DNF
                         </button>
                       </div>
+                    ) : (
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-teal-950/60 text-teal-300 border border-teal-800/60 shrink-0">
+                        Đang chạy
+                      </span>
                     )}
                   </div>
                 );
