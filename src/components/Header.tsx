@@ -218,7 +218,7 @@ export default function Header({ onOpenShare }: HeaderProps) {
             <form onSubmit={handleVerifyPinSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs text-slate-300 font-medium mb-1">
-                  Mã PIN Trọng Tài (Mặc định: <strong className="text-emerald-400 font-mono">8888</strong>):
+                  Nhập Mã PIN Trọng Tài:
                 </label>
                 <input
                   type="password"

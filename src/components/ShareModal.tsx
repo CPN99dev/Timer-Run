@@ -146,10 +146,10 @@ export default function ShareModal({ isOpen, onClose }: ShareModalProps) {
         <div className="space-y-1.5 bg-slate-950/70 p-3 rounded-xl border border-amber-900/40">
           <div className="flex items-center justify-between">
             <label className="text-xs text-amber-300 font-bold flex items-center gap-1">
-              <Shield className="w-3.5 h-3.5" /> Dành Riêng Cho Ban Trọng Tài (Bảo Mật):
+              <Shield className="w-3.5 h-3.5" /> Dành Riêng Cho Ban Trọng Tài:
             </label>
-            <span className="font-mono text-xs font-bold bg-amber-950 text-amber-300 px-2 py-0.5 rounded border border-amber-700">
-              Mã PIN: {state.refereePin || '8888'}
+            <span className="text-[10px] text-amber-400/80 font-medium bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
+              Yêu cầu bảo mật
             </span>
           </div>
 
