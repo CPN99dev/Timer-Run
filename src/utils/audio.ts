@@ -99,6 +99,35 @@ class SoundController {
       // ignore
     }
   }
+
+  public playRaceComplete() {
+    if (!this.isEnabled) return;
+    try {
+      const ctx = this.getContext();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const noteStart = now + idx * 0.12;
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, noteStart);
+        gain.gain.setValueAtTime(0.35, noteStart);
+        gain.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.4);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(noteStart);
+        osc.stop(noteStart + 0.4);
+      });
+    } catch {
+      // ignore
+    }
+  }
 }
 
 export const sound = new SoundController();

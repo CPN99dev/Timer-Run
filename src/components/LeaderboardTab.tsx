@@ -15,15 +15,18 @@ import {
   Clock,
   Sparkles,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Edit3
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import EditRunnerModal, { EditTarget } from '@/components/EditRunnerModal';
 
 export default function LeaderboardTab() {
-  const { state } = useRace();
+  const { state, role } = useRace();
   const [boardType, setBoardType] = useState<'individual' | 'team'>('individual');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [editingTarget, setEditingTarget] = useState<EditTarget | null>(null);
 
   // Trigger celebration confetti
   const triggerConfetti = () => {
@@ -235,6 +238,18 @@ export default function LeaderboardTab() {
                       <div className="truncate">
                         <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
                           {runner.name}
+                          {role === 'referee' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTarget({ type: 'individual', runner });
+                              }}
+                              className="text-slate-500 hover:text-emerald-400 p-0.5 rounded transition-colors"
+                              title="Sửa thông tin VĐV"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {index === 0 && isFinished && (
                             <span className="text-[10px] text-amber-400 font-semibold px-1.5 py-0.2 bg-amber-950/80 rounded border border-amber-800/60">
                               Vô địch
@@ -371,13 +386,25 @@ export default function LeaderboardTab() {
                         {team.members.map((m, mIdx) => (
                           <div
                             key={m.id}
-                            className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-xs"
+                            className="bg-slate-950/80 border border-slate-800 rounded-lg p-2 flex items-center justify-between text-xs gap-1.5"
                           >
-                            <div className="truncate pr-2">
-                              <span className="font-mono font-bold text-emerald-400 mr-1.5">
+                            <div className="truncate pr-1 flex items-center gap-1">
+                              <span className="font-mono font-bold text-emerald-400 mr-1 shrink-0">
                                 #{m.bib}
                               </span>
                               <span className="text-slate-200 truncate">{m.name}</span>
+                              {role === 'referee' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingTarget({ type: 'team_member', teamId: team.id, member: m, teamName: team.teamName });
+                                  }}
+                                  className="text-slate-500 hover:text-emerald-400 p-0.5 rounded transition-colors shrink-0"
+                                  title={`Sửa thông tin #${m.bib}`}
+                                >
+                                  <Edit3 className="w-3 h-3" />
+                                </button>
+                              )}
                             </div>
 
                             <div className="font-mono font-semibold text-right shrink-0">
@@ -400,6 +427,13 @@ export default function LeaderboardTab() {
           )}
         </div>
       )}
+
+      {/* Edit Runner Modal */}
+      <EditRunnerModal
+        isOpen={Boolean(editingTarget)}
+        onClose={() => setEditingTarget(null)}
+        target={editingTarget}
+      />
     </div>
   );
 }

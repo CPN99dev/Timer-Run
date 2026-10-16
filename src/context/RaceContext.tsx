@@ -38,10 +38,11 @@ interface RaceContextType {
   unlockInformation: () => void;
   addIndividualRunner: (bib: string, name: string, gender?: 'Nam' | 'Nữ' | 'Khác') => { success: boolean; error?: string };
   removeIndividualRunner: (id: string) => void;
-  editIndividualRunner: (id: string, updates: Partial<IndividualRunner>) => void;
+  editIndividualRunner: (id: string, updates: { bib: string; name: string; gender?: 'Nam' | 'Nữ' | 'Khác' }) => { success: boolean; error?: string };
   addTeam: (teamName: string, members: { bib: string; name: string }[]) => { success: boolean; error?: string };
   removeTeam: (id: string) => void;
   editTeam: (id: string, teamName: string, members: { bib: string; name: string }[]) => { success: boolean; error?: string };
+  editTeamMember: (teamId: string, memberId: string, updates: { bib: string; name: string }) => { success: boolean; error?: string };
   loadSampleData: () => void;
   clearAllData: () => void;
   
@@ -271,13 +272,47 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
-  const editIndividualRunner = (id: string, updates: Partial<IndividualRunner>) => {
-    if (state.isLocked) return;
+  const editIndividualRunner = (
+    id: string,
+    updates: { bib: string; name: string; gender?: 'Nam' | 'Nữ' | 'Khác' }
+  ): { success: boolean; error?: string } => {
+    const cleanBib = updates.bib.trim().toUpperCase();
+    const cleanName = updates.name.trim();
+
+    if (!cleanBib || !cleanName) {
+      return { success: false, error: 'Vui lòng điền đủ số BIB và Họ tên VĐV' };
+    }
+
+    // Check duplicate BIB against other individual runners
+    const dupInd = state.individualRunners.some(r => r.id !== id && r.bib.toUpperCase() === cleanBib);
+    // Check duplicate BIB against all team members
+    const dupTeam = state.teams.some(t => t.members.some(m => m.bib.toUpperCase() === cleanBib));
+
+    if (dupInd || dupTeam) {
+      return { success: false, error: `Số BIB ${cleanBib} đã được sử dụng bởi VĐV khác!` };
+    }
+
+    const now = Date.now();
     setState(prev => ({
       ...prev,
-      individualRunners: prev.individualRunners.map(r => r.id === id ? { ...r, ...updates } : r),
-      updatedAt: Date.now(),
+      individualRunners: prev.individualRunners.map(r => {
+        if (r.id === id) {
+          return {
+            ...r,
+            bib: cleanBib,
+            name: cleanName,
+            gender: updates.gender || r.gender,
+          };
+        }
+        return r;
+      }),
+      lastFinishedAction: prev.lastFinishedAction && prev.lastFinishedAction.runnerId === id
+        ? { ...prev.lastFinishedAction, bib: cleanBib, runnerName: cleanName }
+        : prev.lastFinishedAction,
+      updatedAt: now,
     }));
+
+    return { success: true };
   };
 
   const addTeam = (teamName: string, membersData: { bib: string; name: string }[]) => {
@@ -391,6 +426,58 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       }),
       updatedAt: Date.now(),
     }));
+    return { success: true };
+  };
+
+  const editTeamMember = (
+    teamId: string,
+    memberId: string,
+    updates: { bib: string; name: string }
+  ): { success: boolean; error?: string } => {
+    const cleanBib = updates.bib.trim().toUpperCase();
+    const cleanName = updates.name.trim();
+
+    if (!cleanBib || !cleanName) {
+      return { success: false, error: 'Vui lòng điền đủ số BIB và Họ tên VĐV' };
+    }
+
+    // Check duplicate BIB against all individual runners
+    const dupInd = state.individualRunners.some(r => r.bib.toUpperCase() === cleanBib);
+    // Check duplicate BIB against other team members
+    const dupTeam = state.teams.some(t =>
+      t.members.some(m => m.id !== memberId && m.bib.toUpperCase() === cleanBib)
+    );
+
+    if (dupInd || dupTeam) {
+      return { success: false, error: `Số BIB ${cleanBib} đã được sử dụng bởi VĐV khác!` };
+    }
+
+    const now = Date.now();
+    setState(prev => ({
+      ...prev,
+      teams: prev.teams.map(t => {
+        if (t.id !== teamId) return t;
+        const updatedMembers = t.members.map(m => {
+          if (m.id === memberId) {
+            return {
+              ...m,
+              bib: cleanBib,
+              name: cleanName,
+            };
+          }
+          return m;
+        }) as [TeamMember, TeamMember, TeamMember];
+        return {
+          ...t,
+          members: updatedMembers,
+        };
+      }),
+      lastFinishedAction: prev.lastFinishedAction && prev.lastFinishedAction.runnerId === memberId
+        ? { ...prev.lastFinishedAction, bib: cleanBib, runnerName: cleanName }
+        : prev.lastFinishedAction,
+      updatedAt: now,
+    }));
+
     return { success: true };
   };
 
@@ -516,8 +603,33 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       const runner = state.individualRunners.find(r => r.id === id);
       if (!runner || runner.status !== 'running') return false;
 
+      const updatedInd = state.individualRunners.map(r => {
+        if (r.id === id) {
+          return {
+            ...r,
+            status: 'finished' as RunnerStatus,
+            finishTime: now,
+            elapsedMs: elapsed,
+          };
+        }
+        return r;
+      });
+
+      const stillRunningInd = updatedInd.filter(r => r.status === 'running').length;
+      const stillRunningTeam = state.teams.reduce(
+        (acc, t) => acc + t.members.filter(m => m.status === 'running').length,
+        0
+      );
+      const isRaceComplete = (stillRunningInd + stillRunningTeam) === 0;
+
+      if (isRaceComplete) {
+        sound.playRaceComplete();
+        triggerHaptic([100, 50, 100, 50, 200]);
+      }
+
       setState(prev => ({
         ...prev,
+        endTime: isRaceComplete ? now : prev.endTime,
         lastFinishedAction: {
           type: 'individual',
           runnerId: runner.id,
@@ -527,17 +639,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           runnerName: runner.name,
           bib: runner.bib,
         },
-        individualRunners: prev.individualRunners.map(r => {
-          if (r.id === id) {
-            return {
-              ...r,
-              status: 'finished',
-              finishTime: now,
-              elapsedMs: elapsed,
-            };
-          }
-          return r;
-        }),
+        individualRunners: updatedInd,
         updatedAt: now,
       }));
       return true;
@@ -547,8 +649,51 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       const member = team.members.find(m => m.id === id);
       if (!member || member.status !== 'running') return false;
 
+      const updatedTeams = state.teams.map(t => {
+        if (t.id !== teamId) return t;
+        const updatedMembers = t.members.map(m => {
+          if (m.id === id) {
+            return {
+              ...m,
+              status: 'finished' as RunnerStatus,
+              finishTime: now,
+              elapsedMs: elapsed,
+            };
+          }
+          return m;
+        }) as [TeamMember, TeamMember, TeamMember];
+
+        const finishedCount = updatedMembers.filter(m => m.status === 'finished').length;
+        const allFinished = finishedCount === 3;
+        let totalElapsedMs: number | null = null;
+        if (allFinished) {
+          totalElapsedMs = updatedMembers.reduce((sum, m) => sum + (m.elapsedMs || 0), 0);
+        }
+
+        return {
+          ...t,
+          members: updatedMembers,
+          finishedCount,
+          status: (allFinished ? 'finished' : 'running') as RunnerStatus,
+          totalElapsedMs,
+        };
+      });
+
+      const stillRunningInd = state.individualRunners.filter(r => r.status === 'running').length;
+      const stillRunningTeam = updatedTeams.reduce(
+        (acc, t) => acc + t.members.filter(m => m.status === 'running').length,
+        0
+      );
+      const isRaceComplete = (stillRunningInd + stillRunningTeam) === 0;
+
+      if (isRaceComplete) {
+        sound.playRaceComplete();
+        triggerHaptic([100, 50, 100, 50, 200]);
+      }
+
       setState(prev => ({
         ...prev,
+        endTime: isRaceComplete ? now : prev.endTime,
         lastFinishedAction: {
           type: 'team_member',
           runnerId: member.id,
@@ -559,35 +704,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
           runnerName: member.name,
           bib: member.bib,
         },
-        teams: prev.teams.map(t => {
-          if (t.id !== teamId) return t;
-          const updatedMembers = t.members.map(m => {
-            if (m.id === id) {
-              return {
-                ...m,
-                status: 'finished' as RunnerStatus,
-                finishTime: now,
-                elapsedMs: elapsed,
-              };
-            }
-            return m;
-          }) as [TeamMember, TeamMember, TeamMember];
-
-          const finishedCount = updatedMembers.filter(m => m.status === 'finished').length;
-          const allFinished = finishedCount === 3;
-          let totalElapsedMs: number | null = null;
-          if (allFinished) {
-            totalElapsedMs = updatedMembers.reduce((sum, m) => sum + (m.elapsedMs || 0), 0);
-          }
-
-          return {
-            ...t,
-            members: updatedMembers,
-            finishedCount,
-            status: allFinished ? 'finished' : 'running',
-            totalElapsedMs,
-          };
-        }),
+        teams: updatedTeams,
         updatedAt: now,
       }));
       return true;
@@ -640,23 +757,34 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
     const cleanBib = bib.trim().toUpperCase();
     setState(prev => {
       const now = Date.now();
+      const updatedInd = prev.individualRunners.map(r => {
+        if (r.bib.toUpperCase() === cleanBib) {
+          return { ...r, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null };
+        }
+        return r;
+      });
+      const updatedTeams = prev.teams.map(t => {
+        const updatedMembers = t.members.map(m => {
+          if (m.bib.toUpperCase() === cleanBib) {
+            return { ...m, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null };
+          }
+          return m;
+        }) as [TeamMember, TeamMember, TeamMember];
+        return { ...t, members: updatedMembers };
+      });
+
+      const stillRunningInd = updatedInd.filter(r => r.status === 'running').length;
+      const stillRunningTeam = updatedTeams.reduce(
+        (acc, t) => acc + t.members.filter(m => m.status === 'running').length,
+        0
+      );
+      const isRaceComplete = (stillRunningInd + stillRunningTeam) === 0;
+
       return {
         ...prev,
-        individualRunners: prev.individualRunners.map(r => {
-          if (r.bib.toUpperCase() === cleanBib) {
-            return { ...r, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null };
-          }
-          return r;
-        }),
-        teams: prev.teams.map(t => {
-          const updatedMembers = t.members.map(m => {
-            if (m.bib.toUpperCase() === cleanBib) {
-              return { ...m, status: 'dnf' as RunnerStatus, finishTime: null, elapsedMs: null };
-            }
-            return m;
-          }) as [TeamMember, TeamMember, TeamMember];
-          return { ...t, members: updatedMembers };
-        }),
+        endTime: isRaceComplete ? now : prev.endTime,
+        individualRunners: updatedInd,
+        teams: updatedTeams,
         updatedAt: now,
       };
     });
@@ -673,6 +801,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       if (action.type === 'individual') {
         return {
           ...prev,
+          endTime: null, // Resume clock if stopped
           lastFinishedAction: null,
           individualRunners: prev.individualRunners.map(r => {
             if (r.id === action.runnerId) {
@@ -690,6 +819,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
       } else if (action.type === 'team_member' && action.teamId) {
         return {
           ...prev,
+          endTime: null, // Resume clock if stopped
           lastFinishedAction: null,
           teams: prev.teams.map(t => {
             if (t.id !== action.teamId) return t;
@@ -710,7 +840,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
               ...t,
               members: updatedMembers,
               finishedCount,
-              status: finishedCount === 3 ? 'finished' : 'running',
+              status: (finishedCount === 3 ? 'finished' : 'running') as RunnerStatus,
               totalElapsedMs: null,
             };
           }),
@@ -779,6 +909,7 @@ export function RaceProvider({ children }: { children: React.ReactNode }) {
         addTeam,
         removeTeam,
         editTeam,
+        editTeamMember,
         loadSampleData,
         clearAllData,
         startRace,

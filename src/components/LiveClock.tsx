@@ -36,17 +36,36 @@ export default function LiveClock() {
   const totalFinishedTeams = state.teams.filter(t => t.finishedCount === 3).length;
   const totalTeams = state.teams.length;
 
+  const isCompleted = Boolean(state.isStarted && state.endTime);
+
+  useEffect(() => {
+    if (isCompleted) {
+      import('canvas-confetti').then((confettiModule) => {
+        confettiModule.default({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.5 },
+        });
+      });
+    }
+  }, [isCompleted]);
+
   return (
     <div className="bg-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-800 relative overflow-hidden">
       {/* Background glow when race is active */}
-      {state.isStarted && (
+      {state.isStarted && !isCompleted && (
         <div className="absolute -top-12 -right-12 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      )}
+      {isCompleted && (
+        <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
       )}
 
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
-            {state.isStarted ? (
+            {isCompleted ? (
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-400"></span>
+            ) : state.isStarted ? (
               <>
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
@@ -56,7 +75,11 @@ export default function LiveClock() {
             )}
           </span>
           <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
-            {state.isStarted ? 'Đồng hồ chính đang chạy' : 'Chưa xuất phát'}
+            {isCompleted
+              ? '🏁 Đã Dừng Tự Động (Tất cả VĐV đã về đích)'
+              : state.isStarted
+              ? 'Đồng hồ chính đang chạy'
+              : 'Chưa xuất phát'}
           </span>
         </div>
 
@@ -119,9 +142,15 @@ export default function LiveClock() {
                 <RotateCcw className="w-4 h-4" /> Đặt lại
               </button>
               
-              <div className="flex-1 bg-emerald-950/40 border border-emerald-800/40 rounded-xl flex items-center justify-center text-emerald-400 text-xs font-medium px-3">
-                Đang bấm giờ từng người ở tab Bấm Giờ 👇
-              </div>
+              {isCompleted ? (
+                <div className="flex-1 bg-amber-950/50 border border-amber-700/60 rounded-xl flex items-center justify-center text-amber-300 text-xs font-semibold px-3 py-2 text-center">
+                  🎉 Tất cả VĐV đã về đích! Đồng hồ đã tự động dừng. Xem xếp hạng ở tab bên cạnh 👇
+                </div>
+              ) : (
+                <div className="flex-1 bg-emerald-950/40 border border-emerald-800/40 rounded-xl flex items-center justify-center text-emerald-400 text-xs font-medium px-3">
+                  Đang bấm giờ từng người ở tab Bấm Giờ 👇
+                </div>
+              )}
             </div>
           )}
         </div>

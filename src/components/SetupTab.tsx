@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRace } from '@/context/RaceContext';
 import { UserPlus, Users, Trash2, Edit3, Database, ShieldAlert, Check, X, Sparkles } from 'lucide-react';
+import EditRunnerModal, { EditTarget } from '@/components/EditRunnerModal';
 
 export default function SetupTab() {
   const {
@@ -17,6 +18,7 @@ export default function SetupTab() {
   } = useRace();
 
   const [activeSubTab, setActiveSubTab] = useState<'individual' | 'team'>('individual');
+  const [editingTarget, setEditingTarget] = useState<EditTarget | null>(null);
   
   // Individual Form
   const [indBib, setIndBib] = useState('');
@@ -244,14 +246,25 @@ export default function SetupTab() {
                       </div>
                     </div>
 
-                    {role === 'referee' && !isLocked && (
-                      <button
-                        onClick={() => removeIndividualRunner(runner.id)}
-                        className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-                        title="Xoá VĐV"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    {role === 'referee' && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditingTarget({ type: 'individual', runner })}
+                          className="text-slate-400 hover:text-emerald-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                          title="Sửa thông tin VĐV (Tên, BIB, Giới tính)"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        {!isLocked && (
+                          <button
+                            onClick={() => removeIndividualRunner(runner.id)}
+                            className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                            title="Xoá VĐV"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -440,19 +453,30 @@ export default function SetupTab() {
                       {team.members.map((member, idx) => (
                         <div
                           key={member.id}
-                          className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs"
+                          className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs gap-1.5"
                         >
                           <div className="flex items-center gap-1.5 truncate">
-                            <span className="font-mono font-bold text-emerald-400">#{member.bib}</span>
+                            <span className="font-mono font-bold text-emerald-400 shrink-0">#{member.bib}</span>
                             <span className="text-slate-200 truncate">{member.name}</span>
                           </div>
-                          <span className={
-                            member.status === 'finished' ? 'text-emerald-400 text-[10px] font-semibold' :
-                            member.status === 'running' ? 'text-amber-400 text-[10px]' : 'text-slate-500 text-[10px]'
-                          }>
-                            {member.status === 'finished' ? 'Xong' :
-                             member.status === 'running' ? 'Chạy' : 'Chờ'}
-                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className={
+                              member.status === 'finished' ? 'text-emerald-400 text-[10px] font-semibold' :
+                              member.status === 'running' ? 'text-amber-400 text-[10px]' : 'text-slate-500 text-[10px]'
+                            }>
+                              {member.status === 'finished' ? 'Xong' :
+                               member.status === 'running' ? 'Chạy' : 'Chờ'}
+                            </span>
+                            {role === 'referee' && (
+                              <button
+                                onClick={() => setEditingTarget({ type: 'team_member', teamId: team.id, member, teamName: team.teamName })}
+                                className="text-slate-400 hover:text-emerald-400 p-0.5 rounded hover:bg-slate-800 transition-colors"
+                                title={`Sửa thông tin VĐV #${member.bib}`}
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -463,6 +487,13 @@ export default function SetupTab() {
           </div>
         </div>
       )}
+
+      {/* Edit Runner Modal */}
+      <EditRunnerModal
+        isOpen={Boolean(editingTarget)}
+        onClose={() => setEditingTarget(null)}
+        target={editingTarget}
+      />
     </div>
   );
 }
